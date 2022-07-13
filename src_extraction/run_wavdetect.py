@@ -94,6 +94,10 @@ class Region:
 
         lc = np.loadtxt(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt", skiprows = 1)
 
+        #cleanup
+        os.remove(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt")
+        os.remove(f'{outdir}/{self.name}_{self.obsid}_lc.fits')
+
         hdu_list.close()
 
         return lc
