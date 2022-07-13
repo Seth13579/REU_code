@@ -11,11 +11,10 @@ def galaxy_download(galaxy,radius):
 
     return
 
-def repro(dir = '.'):
+def repro(dir):
 
-    os.chdir(dir)
-    for _dir in os.listdir('.'):
-        chandra_repro.punlearn()
+    repro_string = f'chandra_repro "*" outdir=""'
+
 
 if __name__ == '__main__':
     galaxy = 'NGC 1313'
