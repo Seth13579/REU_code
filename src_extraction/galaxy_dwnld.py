@@ -12,8 +12,6 @@ def galaxy_download(galaxy,radius):
 
     return
 
-
-
 #reprocess all the obsids in the current working directory
 def repro():
     dirs = [i for i in os.listdir(os.getcwd()) if not re.search('[a-zA-Z]',i)]
