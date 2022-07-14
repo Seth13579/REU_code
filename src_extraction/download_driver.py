@@ -29,10 +29,11 @@ def process_galaxy(galaxy,raidus,rerun):
     ############
     #now run wavdetect on each obsid
     all_regions_in_galaxy = []
-    for dir in [i for i in os.listdir(os.getcwd()) if '.' not in i and i != 'textfiles']:
+    dirs = [i for i in os.listdir(os.getcwd()) if '.' not in i and i != 'textfiles']
+    for i,dir in enumerate(dirs):
         obsid = dir.split('/')[-1]
 
-        print(f'Running wavdetect on {obsid}')
+        print(f'Running wavdetect on {obsid}, {i} of {len(dirs)}')
 
         working_dir = f'./{dir}/repro'
 

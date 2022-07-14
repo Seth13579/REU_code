@@ -107,7 +107,8 @@ class Region:
         return Source(lightcurve=self.make_lc(),obsid=self.obsid, position=f'{self.ra}{self.dec}')
 
 def unglob(arr,force=False):
-
+    #force is used to force the program to take the first option of multiple files
+    #and to not ask the user whether or not to continue
     if len(arr) > 1 and not force:
         print('Multiple files found when 1 was expected:')
         print(arr)
@@ -154,7 +155,7 @@ def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an
 #object
 def process_wavdetect(obsid,region_dir,region_file):
     evt = glob.glob(f'{region_dir}/*evt2*')
-    evt = unglob(evt)
+    evt = unglob(evt,True)
 
     regphystocel.punlearn()
     regphystocel.infile = region_file
