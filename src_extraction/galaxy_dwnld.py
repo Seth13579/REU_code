@@ -19,7 +19,7 @@ def repro():
     dirs = [i for i in os.listdir(os.getcwd()) if not re.search('[a-zA-Z]',i)]
 
     for i,dir in enumerate(dirs):
-        repro_string = f'chandra_repro {dir} outdir="" verbose=0'
+        repro_string = f'chandra_repro {dir} outdir="" verbose=0 clobber=yes'
 
         print(f'Reprocessing {dir}, {i+1} of {len(dirs)}')
 
