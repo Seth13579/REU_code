@@ -106,9 +106,9 @@ class Region:
     def make_source(self):
         return Source(lightcurve=self.make_lc(),obsid=self.obsid, position=f'{self.ra}{self.dec}')
 
-def unglob(arr):
+def unglob(arr,force=False):
 
-    if len(arr) > 1:
+    if len(arr) > 1 and not force:
         print('Multiple files found when 1 was expected:')
         print(arr)
         cont = None
@@ -125,7 +125,7 @@ def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an
     #needs a level 2 directory with a chandra evt2 file
     fluximage.punlearn()
     evt = glob.glob(f'{dir}/*evt2*')
-    evt = unglob(evt)
+    evt = unglob(evt,True)
     fluximage.infile= evt
     fluximage.outroot = f'{dir}/detect'
     fluximage.bands = '0.3:7.5:2.3'
