@@ -10,18 +10,20 @@ import multiprocessing as mp
 
 #function to handle computationally expensive steps
 #called in the multithreading step
+#multithreading not yet functional
 def subreprocess(dir):
     obsid = dir.split('/')[-1]
 
     working_dir = f'./{dir}/repro'
 
     # TODO: Multithread this
-    if not rerun:
-        try:
-            wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
-        except:
-            detect(working_dir)
-            wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
+    try:
+        print("Looking for file...")
+        wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
+    except:
+        print('Trying wavdetect...')
+        detect(working_dir)
+        wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
 
     all_regions_in_obsid = process_wavdetect(obsid,working_dir,wavdetect_region)
 
@@ -40,11 +42,15 @@ def process_galaxy(galaxy,raidus,rerun):
         print('Downloading...')
         galaxy_download(galaxy,radius)
 
+        print('Splitting...')
+        split_interleaved()
+
         print('Reprocessing...')
         repro()
 
     else:
         os.chdir(f'./{galaxy}')
+
 
     ############
     #now run wavdetect on each obsid
@@ -54,7 +60,7 @@ def process_galaxy(galaxy,raidus,rerun):
 
     all_regions_in_galaxy = []
     for i,dir in enumerate(dirs):
-        print(f'Running on {dir}, {i+1} of {len(dirs)}')
+        print(f'\nRunning on {dir}, {i+1} of {len(dirs)}')
 
         all_regions_in_galaxy.append(subreprocess(dir))
 
@@ -63,8 +69,10 @@ def process_galaxy(galaxy,raidus,rerun):
     print('Matching regions...')
     all_sources_in_galaxy = galaxy_object.region_match()
 
-    if not rerun:
+    try:
         os.makedirs('./textfiles')
+    except:
+        pass
 
     os.chdir('./textfiles')
 
