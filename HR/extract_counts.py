@@ -21,7 +21,7 @@ def unglob(arr):
 
 def download_obsid(obsid):
     if not os.path.isdir(obsid):
-        os.system(f'download_chandra_obsid {obsid} --exclude vvref,evt1')
+        os.system(f'download_chandra_obsid {obsid} --exclude vvref,evt1,evt1a')
     return
 
 def make_regions(obsid,pos,outroot):

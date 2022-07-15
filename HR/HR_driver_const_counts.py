@@ -28,6 +28,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
     if override:
         print('To avoid background issue, you must draw by hand a background region')
         print('Please do that now and then input the absolute path to that region below')
+        print('Make sure to save the region as a fits')
         bkg_region = input('Insert path to hand-drawn region: ')
     else:
         bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
@@ -44,7 +45,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
     try:
         assert area < 100
     except AssertionError as e:
-        print('The background region is wrong, please run the program with "!bkgoverride" at the end and follow the instruction')
+        print('The background region is wrong, please run the program with "bkgoverride" at the end and follow the instruction')
         raise e
 
 
@@ -79,21 +80,15 @@ if __name__ == '__main__':
     position = sys.argv[2]
     N = int(sys.argv[3])
 
-    if len(sys.argv) > 4:
-        bkg_override = sys.argv[4]
-        if bkg_override == '!bkg_override':
-            override = True
-        else:
-            override = False
 
     try:
         lines = np.array(sys.argv[4].split(',')).astype('float64')
-        if '!bkgoverride' in lines:
+        if 'bkgoverride' in lines:
             lines = None
     except (IndexError,TypeError,ValueError):
         lines = None
 
-    if '!bkgoverride' in sys.argv:
+    if 'bkgoverride' in sys.argv:
         main(obsid,position,N,lines,override=True)
     else:
         main(obsid,position,N,lines,override=False)

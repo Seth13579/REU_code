@@ -58,7 +58,6 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
         else:
             #general case, both ends moving
             if i >= N and i+N <= len(times)-1:
-                print('middle')
                 new_count = energy_slice[-1]
                 old_count = energies[low_bound - 1]
 
@@ -74,7 +73,6 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
 
             #left edge: adding a new count but not losing any
             elif i < N:
-                print('left')
                 new_count = energy_slice[-1]
 
                 if new_count <= divide_energy:
@@ -85,7 +83,6 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
             #right edge: losing an old count but not gaining any
             #elif i+N <= len(times)-1:
             else:
-                print('right')
                 old_count = energies[low_bound - 1]
 
                 if old_count <= divide_energy:
