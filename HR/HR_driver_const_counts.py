@@ -43,7 +43,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
     area = region_area(evt,bkg_region,1000)/region_area(evt,src_region,1000)
 
     try:
-        assert area < 100
+        assert area < 50
     except AssertionError as e:
         print('The background region is wrong, please run the program with "bkgoverride" at the end and follow the instruction')
         raise e

@@ -192,64 +192,91 @@ class Source:
 
             if decrease or increase:
                 chunk_edges.append(i+1)
+
         #turning the chunk edges into the chunks themselves
         chunks = [[binned_counts[i] for i in range(chunk_edges[j],chunk_edges[j+1])] for j in range(len(chunk_edges)) if j != len(chunk_edges)-1]
 
         #the above line misses the last chunk, we will add it in manually
         chunks.append([i for i in binned_counts[chunk_edges[-1]:]])
 
-        #initialize the list of interesting chunks which pass the significance test
+
+        #returns the most significantly different chunk from among all chunks
+        #as determined by the e-test
+        def find_interesting_chunk(self,chunks,debug):
+            lowest_p = 1.0
+            most_interesting = None
+
+            #Loop through all the chunks, for each testing if the mean inside the chunk
+            #is significantly different than the mean outside of it
+            for i,chunk in enumerate(chunks):
+                if len(chunk) == 1:
+                    continue
+
+                #build all_others, an array which contains all the chunks beside the
+                #one being examined
+                if i == 0:
+                    all_others = chunks[1:]
+                else:
+                    all_others = chunks[:i]
+                    seg2 = chunks[i+1:]
+
+                    all_others.extend(seg2)
+
+                #flatten all_others
+                all_others = [bin for sub in all_others for bin in sub]
+
+                #if there is a flare, we don't want to consider it if it has fewer than 10 counts
+                if np.mean(chunk) > np.mean(all_others) and sum(chunk) < 10:
+                    continue
+                #if there's a dip and there are fewer than 30 total counts, we also don't want it
+                elif np.mean(chunk) < np.mean(all_others) and self.total_counts < 30:
+                    continue
+
+                #TODO: Find better fix for one bin chunks than just skipping them
+
+                #perform the e-test
+                t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
+
+                #stat, p_val = stats.mannwhitneyu(chunk,all_others)
+
+                if p_val < pthresh:
+
+                    if debug:
+                        print(f'''Detection in chunk {i}
+    This chunk: {chunk}
+    all_others: {all_others}
+    p_val: {p_val}
+    ''')
+
+                    if p_val < lowest_p:
+                        most_interesting = i
+                        lowest_p = p_val
+
+                        if debug:
+                            print('New most interesting chunk')
+
+                else:
+                    if debug:
+                        print(f'''No detection in chunk {i}
+    This chunk: {chunk}
+    all_others: {all_others}
+    p_val: {p_val}
+    ''')
+
+            return most_interesting
+
+
         interesting_chunks = []
 
-        #Loop through all the chunks, for each testing if the mean inside the chunk
-        #is significantly different than the mean outside of it
-        for i,chunk in enumerate(chunks):
-            if len(chunk) == 1:
-                continue
+        repeat = True
+        while repeat:
+            new_interesting = find_interesting_chunk(self,chunks,debug)
 
-            #build all_others, an array which contains all the chunks beside the
-            #one being examined
-            if i == 0:
-                all_others = chunks[1:]
-            else:
-                all_others = chunks[:i]
-                seg2 = chunks[i+1:]
-
-                all_others.extend(seg2)
-
-            #flatten all_others
-            all_others = [bin for sub in all_others for bin in sub]
-
-            #if there is a flare, we don't want to consider it if it has fewer than 10 counts
-            if np.mean(chunk) > np.mean(all_others) and sum(chunk) < 10:
-                continue
-            elif np.mean(chunk) < np.mean(all_others) and self.total_counts < 30:
-                continue
-
-            #perform the t-test
-            #TODO: Find better fix for one bin chunks than just skipping them
-
-            t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
-
-            #stat, p_val = stats.mannwhitneyu(chunk,all_others)
-
-            if p_val < pthresh:
-                interesting_chunks.append(i)
-
-                if debug:
-                    print(f'''Detection in chunk {i}
-This chunk: {chunk}
-all_others: {all_others}
-p_val: {p_val}
-''')
+            if new_interesting is not None:
+                interesting_chunks.append(new_interesting)
 
             else:
-                if debug:
-                    print(f'''No detection in chunk {i}
-This chunk: {chunk}
-all_others: {all_others}
-p_val: {p_val}
-''')
+                repeat = False
 
 
         if not interesting_chunks:
