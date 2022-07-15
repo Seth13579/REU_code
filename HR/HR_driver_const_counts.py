@@ -7,7 +7,7 @@ from run_BEHR import *
 from re import sub
 from create_behr_files import region_area
 
-def main(obsid,position,N,lines,divide_energy=2000):
+def main(obsid,position,N,lines,divide_energy=2000,override=False):
     #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
     #or use:
     BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
@@ -24,7 +24,14 @@ def main(obsid,position,N,lines,divide_energy=2000):
     make_regions(obsid,position,f'{working_dir}/')
 
     src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'))
-    bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
+
+    if override:
+        print('To avoid background issue, you must draw by hand a background region')
+        print('Please do that now and then input the absolute path to that region below')
+        bkg_region = input('Insert path to hand-drawn region: ')
+    else:
+        bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
+
     evt = unglob(glob.glob(f'{primary}/*evt2*'))
 
     #check to see if the background is wrong
@@ -37,7 +44,8 @@ def main(obsid,position,N,lines,divide_energy=2000):
     try:
         assert area < 100
     except AssertionError as e:
-        print('The background region is wrong, please draw a suitible background by hand and run the program with ')
+        print('The background region is wrong, please run the program with "!bkgoverride" at the end and follow the instruction')
+        raise e
 
 
     print('Making BEHR bash file...')
@@ -76,11 +84,16 @@ if __name__ == '__main__':
         if bkg_override == '!bkg_override':
             override = True
         else:
-            override = False 
+            override = False
 
     try:
         lines = np.array(sys.argv[4].split(',')).astype('float64')
+        if '!bkgoverride' in lines:
+            lines = None
     except (IndexError,TypeError,ValueError):
         lines = None
 
-    main(obsid,position,N,lines)
+    if '!bkgoverride' in sys.argv:
+        main(obsid,position,N,lines,override=True)
+    else:
+        main(obsid,position,N,lines,override=False)
