@@ -99,7 +99,7 @@ class Galaxy:
 
         for i,region1 in enumerate(mast_region_list):
 
-            print(f'\nLooking to match a region in {reg1.obsid}, {i+1} of {len(mast_region_list)}:')
+            print(f'\nLooking to match a region in {region1.obsid}, {i+1} of {len(mast_region_list)}:')
             matched = False
 
             for source in all_dict.keys():
