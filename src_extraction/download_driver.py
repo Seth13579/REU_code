@@ -18,7 +18,7 @@ def subreprocess(dir):
 
     # TODO: Multithread this
     try:
-        print("Looking for file...")
+        print("Looking for wavdetect product...")
         wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
     except:
         print('Trying wavdetect...')
