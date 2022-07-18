@@ -166,25 +166,35 @@ def process_wavdetect(obsid,region_dir,region_file):
 
     regiontxt = np.loadtxt(f'{region_dir}/wavdetect_wcs_reg.fits',dtype='str',skiprows=3)
 
-    #incredibly ugly way of taking the data in the array and mapping it into
-    #multiple region objects
-    regions = [Region(region_file,line,line[7:].strip('()').split(',')[0], line[7:].strip('()').split(',')[1],max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'), min(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'),obsid,evt) for line in regiontxt]
+    def make_dec(line):
+        dec = line[7:].strip('()').split(',')[1]
+
+        if '-' not in dec or not '+' in dec:
+            dec = f'+{dec}'
+
+        return dec
+
+    regions = [Region(region_file, #path
+                line, #reg text
+                line[7:].strip('()').split(',')[0], #ra
+                make_dec(line), #dec
+                max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'), #a
+                min(line[7:].strip('()').split(',')[2], line[7:].strip('()').split(',')[3]).rstrip('"'), #b
+                obsid, #obsid
+                evt) #evt
+                for line in regiontxt]
 
     out = Obsid_all_regions(obsid,regions)
 
     return out
 
 if __name__ == '__main__':
-    obsid = sys.argv[1]
-    dir = sys.argv[2]
+    region_dir = sys.argv[1]
 
-    detect(dir)
+    obsid = '10551_e2'
 
-    regions = process_wavdetect(obsid,dir,'detect_src.fits').all_regions
+    regions = process_wavdetect(obsid,region_dir,f'{region_dir}/detect_src.fits').all_regions
 
-    #print(regions[0].regtext)
-    print(regions[0].ra)
-    print(regions[0].dec)
-    #print(regions[0].a)
-    #print(regions[0].b)
-    #print(regions[0].obsid)
+
+    for reg in regions:
+        print(reg.dec)
