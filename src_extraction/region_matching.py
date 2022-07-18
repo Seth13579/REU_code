@@ -13,8 +13,25 @@ def seperation(reg1,reg2):
     coord_str_1 = " ".join([reg1.ra,reg1.dec])
     coord_str_2 = " ".join([reg2.ra,reg2.dec])
 
-    ra1,dec1 = pyasl.coordsSexaToDeg(coord_str_1)
-    ra2,dec2 = pyasl.coordsSexaToDeg(coord_str_2)
+    try:
+        ra1,dec1 = pyasl.coordsSexaToDeg(coord_str_1)
+    except Exception as e:
+        print(reg1.ra)
+        print(reg1.dec)
+        print(reg1.path)
+
+        raise e
+    try:
+        ra2,dec2 = pyasl.coordsSexaToDeg(coord_str_2)
+    except Exception as e:
+        print(reg2.ra)
+        print(reg2.dec)
+        print(reg2.path)
+
+        raise e
+
+
+
 
     c1 = SkyCoord(ra1,dec1,unit=u.deg,frame='fk5')
     c2 = SkyCoord(ra2,dec2,unit=u.deg,frame='fk5')
@@ -80,14 +97,16 @@ class Galaxy:
         '''
         all_dict = {}
 
-        for region1 in mast_region_list:
+        for i,region1 in enumerate(mast_region_list):
 
+            print(f'\nLooking to match {region1.path}, {i+1} of {len(mast_region_list)}:')
             matched = False
 
             for source in all_dict.keys():
                 test_against = all_dict[source]
 
                 for region2 in test_against:
+
                     if match_test(region1,region2):
                         #add the region to the dictionary so we can later check against it
                         all_dict[source].append(region1)
@@ -97,6 +116,8 @@ class Galaxy:
 
                         matched = True
 
+                        print('Match!')
+
                         break
 
                 if matched:
@@ -104,6 +125,8 @@ class Galaxy:
 
             #after we check all the sources, if no match, then we have a new source
             if not matched:
+
+                print('No match, making new source...')
 
                 new_source = region1.make_source()
 
