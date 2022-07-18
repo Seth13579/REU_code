@@ -24,8 +24,10 @@ def subreprocess(dir):
         print('Trying wavdetect...')
         detect(working_dir)
         wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
-
-    all_regions_in_obsid = process_wavdetect(obsid,working_dir,wavdetect_region)
+    else:
+        print('Found!')
+    finally:
+        all_regions_in_obsid = process_wavdetect(obsid,working_dir,wavdetect_region)
 
     return all_regions_in_obsid
 
