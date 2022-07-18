@@ -120,6 +120,7 @@ def unglob(arr,force=False):
     elif len(arr) == 0:
         print('No files found')
         raise Exception
+
     return str(arr[0]).strip("'[]'")
 
 def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an obsid
@@ -169,6 +170,8 @@ def process_wavdetect(obsid,region_dir,region_file):
     def make_dec(line):
         dec = line[7:].strip('()').split(',')[1]
 
+        #the default for declination is positive,
+        #in which case we have to add a plus sign for pyasl
         if '-' not in dec or not '+' in dec:
             dec = f'+{dec}'
 

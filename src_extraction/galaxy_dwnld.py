@@ -7,6 +7,8 @@ import re
 import glob
 
 def galaxy_download(galaxy,radius):
+    os.system('punlearn find_chandra_obsid')
+
     search_str = f'find_chandra_obsid "{galaxy}" radius={radius} grating=none instrument=acis download=all'
 
     os.system(search_str)
@@ -23,6 +25,7 @@ def check_for_interleaved(dir):
 
 #runs splitobs on the given directory
 def run_split(dir):
+    os.system('punlearn splitobs')
     os.system(f'splitobs indir={dir} outroot={dir} clobber=yes')
     os.system(f'rm -rf {dir}')
 
@@ -41,10 +44,11 @@ def split_interleaved():
 #reprocess all the obsids in the current working directory
 def repro():
     #regex used to find any directory with at least three digits in a row
-    #assuming that these are the obsids 
+    #assuming that these are the obsids
     dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d\d\d',i)]
 
     for i,dir in enumerate(dirs):
+        os.system('punlearn chandra_repro')
         repro_string = f'chandra_repro {dir} outdir="" verbose=0 clobber=yes'
 
         print(f'Reprocessing {dir}, {i+1} of {len(dirs)}')
