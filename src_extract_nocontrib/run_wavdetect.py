@@ -149,8 +149,11 @@ def process_wavdetect(obsid,region_dir,region_file):
     os.system('punlearn regphystocel')
     os.system(f'regphystocel infile={region_file} outfile={region_dir}/wavdetect_wcs_reg.fits wcsfile={evt} verbose=0 clobber+')
 
-    regiontxt = np.loadtxt(f'{region_dir}/wavdetect_wcs_reg.fits',dtype='str',skiprows=3)
+    regiontxt = np.loadtxt(f'{region_dir}/wavdetect_wcs_reg.fits',dtype='str',skiprows=3,ndmin=1)
 
+    if len(regiontxt) == 0:
+        return None
+        
     def make_dec(line):
         dec = line[7:].strip('()').split(',')[1]
 

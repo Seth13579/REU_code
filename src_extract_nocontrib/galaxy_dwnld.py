@@ -21,6 +21,11 @@ def check_for_interleaved(dir):
     else:
         return False
 
+def obsid_download(obsid):
+    os.system(f'download_chandra_obsid {obsid}')
+
+    return
+
 #runs splitobs on the given directory
 def run_split(dir):
     os.system('punlearn splitobs')
