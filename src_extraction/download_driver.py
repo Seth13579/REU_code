@@ -6,7 +6,7 @@ import numpy as np
 import os
 import sys
 import glob
-import multiprocessing as mp
+
 
 #function to handle computationally expensive steps
 #called in the multithreading step

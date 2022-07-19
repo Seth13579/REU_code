@@ -5,32 +5,14 @@ import os
 import sys
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from PyAstronomy import pyasl
 
 #when given two regions, returns their seperation in arcsec
 def seperation(reg1,reg2):
-    #first convert sexigesimal coordinates to degrees
-    coord_str_1 = " ".join([reg1.ra,reg1.dec])
-    coord_str_2 = " ".join([reg2.ra,reg2.dec])
 
-    try:
-        ra1,dec1 = pyasl.coordsSexaToDeg(coord_str_1)
-    except Exception as e:
-        print(reg1.ra)
-        print(reg1.dec)
-        print(reg1.path)
-
-        raise e
-    try:
-        ra2,dec2 = pyasl.coordsSexaToDeg(coord_str_2)
-    except Exception as e:
-        print(reg2.ra)
-        print(reg2.dec)
-        print(reg2.path)
-
-        raise e
-
-
+    ra1 = reg1.ra
+    dec1 = reg1.dec
+    ra2 = reg2.ra
+    dec2 = reg2.dec
 
 
     c1 = SkyCoord(ra1,dec1,unit=u.deg,frame='fk5')
