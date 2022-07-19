@@ -64,7 +64,10 @@ def process_galaxy(galaxy,raidus,rerun):
     for i,dir in enumerate(dirs):
         print(f'\nRunning on {dir}, {i+1} of {len(dirs)}')
 
-        all_regions_in_galaxy.append(subreprocess(dir))
+        new = subreprocess(dir)
+
+        if new is not None:
+            all_regions_in_galaxy.append(new)
 
     galaxy_object = Galaxy(galaxy,all_regions_in_galaxy)
 

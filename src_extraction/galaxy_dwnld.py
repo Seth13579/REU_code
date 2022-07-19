@@ -1,6 +1,4 @@
 #functions for downloading all the obsids for a given galaxy name
-
-from ciao_contrib.runtool import chandra_repro
 import sys
 import os
 import re
@@ -14,6 +12,14 @@ def galaxy_download(galaxy,radius):
     os.system(search_str)
 
     return
+
+#downloads the given obsid to the current working directory
+def obsid_download(obsid):
+    os.system('punlearn download_chandra_obsid')
+    os.system(f'download_chandra_obsid {obsid}')
+
+    return
+
 
 #returns true if the given directory is an interleaved observation
 def check_for_interleaved(dir):
