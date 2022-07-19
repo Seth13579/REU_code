@@ -65,9 +65,13 @@ class Region:
 
     def make_lc(self,outdir='.'):
 
+        self_region = f"{outdir}/TEMP_{self.name}_{self.obsid}_reg.reg"
+        with open(self_region,'w') as reg_file:
+            reg_file.write(self.regtext)
+
         dmextract.punlearn()
 
-        dmextract.infile = f'{self.evt}[sky=region({self.path})][bin time=::3.24104]'
+        dmextract.infile = f'{self.evt}[sky=region({self_region})][bin time=::3.24104]'
         dmextract.outfile = f'{outdir}/{self.name}_{self.obsid}_lc.fits'
         dmextract.opt = 'ltc1'
         dmextract.clobber = 'yes'
@@ -97,6 +101,7 @@ class Region:
         #cleanup
         os.remove(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt")
         os.remove(f'{outdir}/{self.name}_{self.obsid}_lc.fits')
+        os.remove(self_region)
 
         hdu_list.close()
 
@@ -172,7 +177,7 @@ def process_wavdetect(obsid,region_dir,region_file):
 
         #the default for declination is positive,
         #in which case we have to add a plus sign for pyasl
-        if '-' not in dec or not '+' in dec:
+        if '-' not in dec and not '+' in dec:
             dec = f'+{dec}'
 
         return dec
@@ -200,4 +205,7 @@ if __name__ == '__main__':
 
 
     for reg in regions:
+        print(reg.ra)
         print(reg.dec)
+        print(reg.regtext)
+        print('\n')
