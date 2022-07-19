@@ -1,0 +1,190 @@
+#functions and classes for running wavdetect on an obsid
+
+#from ciao_contrib.runtool import *
+import sys
+import os
+import glob
+import numpy as np
+from source_class import Source
+from re import sub
+import pandas as pd
+from astropy.io import fits
+from astropy.table import Table
+
+#a class representing all the regions in a given observation
+class Obsid_all_regions:
+
+    def __init__(self,obsid,all_regions):
+
+        #the obsid this object represents
+        self.obsid = obsid
+
+        #a list of all the regions
+        self.all_regions = all_regions
+
+#a class representing a single region
+class Region:
+
+    def __init__(self, path, regtext, ra, dec, a, b, obsid, evt):
+        #the path to the region file
+        self.path = path
+
+        #the actual string of the region, so that it can be recreated as needed
+        self.regtext = regtext
+
+        #the ra of the center of the region
+        #in sexigesimal units
+        self.ra = ra
+
+        #the dec of the center of the region
+        #in sexigesimal units
+        self.dec = dec
+
+        #the semimajor axis of the region
+        self.a = a
+
+        #the semiminor axis of the region
+        self.b = b
+
+        #the obsid of the region
+        self.obsid = obsid
+
+        #the path to the events file of the region
+        self.evt = evt
+
+        ra_mod = sub('\:','',self.ra)
+        dec_mod = sub('\:','',self.ra)
+
+        self.name = f'J{ra_mod}{dec_mod}'
+
+        '''
+        #used by other code, not meant to be interacted with by the user
+        #tracks if the region has been matched to a source
+        self.matched = False
+        '''
+
+    def make_lc(self,outdir='.'):
+
+        self_region = f"{outdir}/TEMP_{self.name}_{self.obsid}_reg.reg"
+        with open(self_region,'w') as reg_file:
+            reg_file.write(self.regtext)
+
+        os.system('punlearn dmextract')
+        os.system(f'dmextract infile="{self.evt}[sky=region({self_region})][bin time=::3.24104]" outfile={outdir}/{self.name}_{self.obsid}_lc.fits opt=ltc1 verbose=0 clobber+')
+
+        # list of columns
+        cols = "TIME_BIN TIME_MIN TIME TIME_MAX COUNTS STAT_ERR AREA EXPOSURE COUNT_RATE COUNT_RATE_ERR"
+        cols = cols.split(" ")
+
+        # accessing fits data
+        hdu_list = fits.open(f'{outdir}/{self.name}_{self.obsid}_lc.fits', memmap=True)
+        evt_data = Table(hdu_list[1].data)
+
+        # initialising DataFrame
+        df = pd.DataFrame()
+
+        # writing to dataframe
+        for col in cols:
+            df[col] = list(evt_data[col])
+
+         # writing to file
+        df.to_csv(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt", index=False, sep=" ")
+
+        lc = np.loadtxt(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt", skiprows = 1)
+
+        #cleanup
+        os.remove(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt")
+        os.remove(f'{outdir}/{self.name}_{self.obsid}_lc.fits')
+        os.remove(self_region)
+
+        hdu_list.close()
+
+        return lc
+
+    #method to make a source object from the region object
+    def make_source(self):
+        return Source(lightcurve=self.make_lc(),obsid=self.obsid, position=f'{self.ra}{self.dec}')
+
+def unglob(arr,force=False):
+    #force is used to force the program to take the first option of multiple files
+    #and to not ask the user whether or not to continue
+    if len(arr) > 1 and not force:
+        print('Multiple files found when 1 was expected:')
+        print(arr)
+        cont = None
+        while cont != 'c' and cont != 'a':
+            cont = input('(c)ontinue or (a)bort? ')
+        if cont == 'a':
+            raise Exception
+    elif len(arr) == 0:
+        print('No files found')
+        raise Exception
+
+    return str(arr[0]).strip("'[]'")
+
+def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an obsid
+    #needs a level 2 directory with a chandra evt2 file
+    os.system('punlearn fluximage')
+    evt = glob.glob(f'{dir}/*evt2*')
+    evt = unglob(evt,True)
+    os.system(f'fluximage infile={evt} outroot={dir}/detect bands=0.3:7.5:2.3 psfecf=0.9 verbose=0 clobber+')
+
+
+    os.system('punlearn wavdetect')
+    img = glob.glob(f'{dir}/*thresh.img')
+    img = unglob(img)
+    psf = glob.glob(f'{dir}/*thresh.psfmap')
+    psf = unglob(psf)
+
+    os.system(f'wavdetect infile={img} psffile={psf} outfile={dir}/detect_src.fits imagefile={dir}/detect_imgfile.fits regfile={dir}/detect_src.reg defnbkgfile={dir}/detect_nbgd.fits scellfile={dir}/detect_scell.fits scales="2.0 4.0" verbose=0 clobber+')
+
+    return
+
+#when given as argument a region from wavdetect, returns an Obsid_all_regions
+#object
+def process_wavdetect(obsid,region_dir,region_file):
+    evt = glob.glob(f'{region_dir}/*evt2*')
+    evt = unglob(evt,True)
+
+    os.system('punlearn regphystocel')
+    os.system(f'regphystocel infile={region_file} outfile={region_dir}/wavdetect_wcs_reg.fits wcsfile={evt} verbose=0 clobber+')
+
+    regiontxt = np.loadtxt(f'{region_dir}/wavdetect_wcs_reg.fits',dtype='str',skiprows=3)
+
+    def make_dec(line):
+        dec = line[7:].strip('()').split(',')[1]
+
+        #the default for declination is positive,
+        #in which case we have to add a plus sign for pyasl
+        if '-' not in dec and not '+' in dec:
+            dec = f'+{dec}'
+
+        return dec
+
+    regions = [Region(region_file, #path
+                line, #reg text
+                line[7:].strip('()').split(',')[0], #ra
+                make_dec(line), #dec
+                max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'), #a
+                min(line[7:].strip('()').split(',')[2], line[7:].strip('()').split(',')[3]).rstrip('"'), #b
+                obsid, #obsid
+                evt) #evt
+                for line in regiontxt]
+
+    out = Obsid_all_regions(obsid,regions)
+
+    return out
+
+if __name__ == '__main__':
+    region_dir = sys.argv[1]
+
+    obsid = '10551_e2'
+
+    regions = process_wavdetect(obsid,region_dir,f'{region_dir}/detect_src.fits').all_regions
+
+
+    for reg in regions:
+        print(reg.ra)
+        print(reg.dec)
+        print(reg.regtext)
+        print('\n')
