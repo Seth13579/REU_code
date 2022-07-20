@@ -272,6 +272,8 @@ class Source:
         while repeat:
             new_interesting = find_interesting_chunk(self,chunks,debug)
 
+            chunks = np.delete(chunks,new_interesting)
+
             if new_interesting is not None:
                 interesting_chunks.append(new_interesting)
 
