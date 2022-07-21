@@ -33,7 +33,10 @@ class Source_All:
         #the average count rate across all observations of the source with
         #non-zero counts
         #units of ks^-1
-        self.av_count_rate_nozeros = 1000*sum([i.total_counts for i in self.obs_nonzero])/sum([i.duration for i in self.obs_nonzero])
+        try:
+            self.av_count_rate_nozeros = 1000*sum([i.total_counts for i in self.obs_nonzero])/sum([i.duration for i in self.obs_nonzero])
+        except:
+            self.av_count_rate_nozeros = 0
 
     def save(self,outdir='.'):
         outfile = f'{outdir}/SOURCE_ALL_{ra}_{dec}.pkl'
