@@ -7,6 +7,37 @@ warnings.filterwarnings("ignore")
 #making a plot with 4 subplots: the cumo counts, the auto binned lc, the
 #1000 s light curve and the 2000 s light curve
 
+def bin_array(xs,ys,binsize):
+    out_y =  []
+    out_x = []
+    y_sum = 0
+    x_sum = 0
+
+    for i in range(len(xs)):
+        x = xs[i]
+        y = ys[i]
+
+        if i == 0:
+            last_x = 0
+        else:
+            last_x = xs[i-1]
+
+        x_sum += (x-last_x)
+        y_sum += y
+
+        if x_sum >= binsize:
+            out_y.append(y_sum)
+            out_x.append(x)
+
+            x_sum = 0
+            y_sum = 0
+    if y_sum != 0:
+        out_y.append(y_sum)
+        out_x.append(x)
+
+    return out_x,out_y
+
+
 def make_full_plot(file,outdir,save=True,show=False,lines=None,trim = True):
     if not show and not save:
         return
@@ -37,16 +68,26 @@ def make_full_plot(file,outdir,save=True,show=False,lines=None,trim = True):
         i = 0
         while counts[i] == 0:
             i += 1
-        i -= 1
 
-        j = -1
-        while counts[j] == 0:
-            j -= 1
-        j += 1
+        if counts[-1] == 0:
+            #print('Trimming off the end')
+            j = -1
+            while counts[j] == 0:
+                j -= 1
+            j +=1
+        else:
+            j = None
 
-        time = time[i:j]
-        counts = counts[i:j]
-        cumo = cumo[i:j]
+        if j is not None:
+            time = time[i:j]
+            counts = counts[i:j]
+            cumo = cumo[i:j]
+        else:
+            time = time[i:]
+            counts = counts[i:]
+            cumo = cumo[i:]
+
+
 
 
 
@@ -57,30 +98,14 @@ def make_full_plot(file,outdir,save=True,show=False,lines=None,trim = True):
     auto_binsize = 500
 
     #start the binning:
-    bin_length_auto = int(auto_binsize/3.24104)
-    bin_length_1 = int(1000/3.24104)
-    bin_length_2 = int(2000/3.24104)
+    bin_length_auto = auto_binsize
+    bin_length_1 = 1000
+    bin_length_2 = 2000
 
 
-    bin_edges_auto = [time[i] for i in range(len(time)) if i%bin_length_auto == 0]
-    bin_edges_1 = [time[i] for i in range(len(time)) if i%bin_length_1 == 0]
-    bin_edges_2 = [time[i] for i in range(len(time)) if i%bin_length_2 == 0]
-
-    try:
-        binned_counts_auto = binned_statistic(time,counts,statistic='sum',bins=bin_edges_auto)[0]
-    except:
-        bin_edges_auto.append(time[-1])
-        binned_counts_auto = binned_statistic(time,counts,statistic='sum',bins=bin_edges_auto)[0]
-    try:
-        binned_counts_1 = binned_statistic(time,counts,statistic='sum',bins=bin_edges_1)[0]
-    except:
-        bin_edges_1.append(time[-1])
-        binned_counts_1 = binned_statistic(time,counts,statistic='sum',bins=bin_edges_1)[0]
-    try:
-        binned_counts_2 = binned_statistic(time,counts,statistic='sum',bins=bin_edges_2)[0]
-    except:
-        bin_edges_2.append(time[-1])
-        binned_counts_2 = binned_statistic(time,counts,statistic='sum',bins=bin_edges_2)[0]
+    bin_edges_auto,binned_counts_auto = bin_array(time,counts,bin_length_auto)
+    bin_edges_1,binned_counts_1 = bin_array(time,counts,bin_length_1)
+    bin_edges_2,binned_counts_2 = bin_array(time,counts,bin_length_2)
 
     fig, axs = plt.subplots(2,2)
     cumo_plt = axs[0,0]
@@ -91,13 +116,13 @@ def make_full_plot(file,outdir,save=True,show=False,lines=None,trim = True):
     cumo_plt.plot(time,cumo)
     cumo_plt.set_title('Cumulative Counts')
 
-    auto_plt.step(bin_edges_auto[:-1],binned_counts_auto)
+    auto_plt.step(bin_edges_auto,binned_counts_auto)
     auto_plt.set_title(f'Bin size: {round(auto_binsize,2)}s')
 
-    bin1_plt.step(bin_edges_1[:-1],binned_counts_1)
+    bin1_plt.step(bin_edges_1,binned_counts_1)
     bin1_plt.set_title('Bin size: 1000s')
 
-    bin2_plt.step(bin_edges_2[:-1],binned_counts_2)
+    bin2_plt.step(bin_edges_2,binned_counts_2)
     bin2_plt.set_title('Bin size: 2000s')
 
     cumo_plt.set(ylabel='Counts')
@@ -107,6 +132,8 @@ def make_full_plot(file,outdir,save=True,show=False,lines=None,trim = True):
     fig.suptitle(trunc_name)
 
     if lines is not None:
+        print(f'Plotting lines at: {lines}')
+
         for ax in axs.flat:
             ax.vlines(lines,ymin=ax.get_ylim()[0],ymax=ax.get_ylim()[1],colors='r',linestyles='dotted')
             #ax.hlines()

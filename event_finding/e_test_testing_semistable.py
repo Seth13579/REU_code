@@ -7,55 +7,6 @@ import glob
 import os
 from statsmodels.stats.rates import test_poisson_2indep
 import multiprocessing as mp
-import re
-import matplotlib.pyplot as plt
-
-def bin_array(xs,ys,binsize):
-    out_y =  []
-    out_x = []
-    y_sum = 0
-    x_sum = 0
-
-    for i in range(len(xs)):
-        x = xs[i]
-        y = ys[i]
-
-        if i == 0:
-            last_x = 0
-        else:
-            last_x = xs[i-1]
-
-        x_sum += (x-last_x)
-        y_sum += y
-
-        if x_sum >= binsize:
-            out_y.append(y_sum)
-            out_x.append(x)
-
-            x_sum = 0
-            y_sum = 0
-    if y_sum != 0:
-        out_y.append(y_sum)
-        out_x.append(x)
-
-    return out_x,out_y
-
-def trimzeros(array):
-    #trim the ends off, if they have 0 counts
-    i = 0
-    while array[i] == 0:
-        i += 1
-
-    if array[-1] == 0:
-        #print('Trimming off the end')
-        j = -1
-        while array[j] == 0:
-            j -= 1
-        j +=1
-    else:
-        j = None
-
-    return i,j
 
 #represents all the observations of a single source
 #and some statistics useful to the program
@@ -76,10 +27,7 @@ class Source_All:
         #the average count rate across all observations of the source with
         #non-zero counts
         #units of ks^-1
-        try:
-            self.av_count_rate_nozeros = 1000*sum([i.total_counts for i in obs_nonzero])/sum([i.duration for i in obs_nonzero])
-        except:
-            self.av_count_rate_nozeros = 0
+        self.av_count_rate_nozeros = 1000*sum([i.total_counts for i in obs_nonzero])/sum([i.duration for i in obs_nonzero])
 
 
 #This object represents the abstract type of a source-obsid pair
@@ -154,50 +102,15 @@ class Source:
         i = 0
         while self.counts[i] == 0:
             i += 1
+        i -= 1
 
-        if self.counts[-1] == 0:
-            #print('Trimming off the end')
-            j = -1
-            while self.counts[j] == 0:
-                j -= 1
-            j +=1
-        else:
-            j = None
+        j = -1
+        while self.counts[j] == 0:
+            j -= 1
+        j +=1
 
-        if j is not None:
-            #print(f'Trimming: [{i}:{j}]')
-            time = self.times[i:j]
-            counts = self.counts[i:j]
-        else:
-            time = self.times[i:]
-            counts = self.counts[i:]
-
-        time = time - time[0]
-
-        '''
-        try:
-            bin_length = round(binsize/3.24014)
-            bin_edges = [time[i] for i in range(len(time)) if i%bin_length == 0]
-            for k in bin_edges:
-                print(k)
-
-            binned_counts = stats.binned_statistic(time,counts,statistic='sum',bins=bin_edges)[0]
-        except Exception as d:
-            print('Exception handled')
-
-            bin_edges.append(time[-1])
-            binned_counts = stats.binned_statistic(time,counts,statistic='sum',bins=bin_edges)[0]
-        '''
-
-        binned_times,binned_counts = bin_array(time,counts,binsize)
-
-
-
-        return binned_times,binned_counts
-
-    def make_binned_counts_notrim(self,binsize):
-        if self.is_zero():
-            return None
+        time = self.times[i:j]
+        counts = self.counts[i:j]
 
         time = self.times
         counts = self.counts
@@ -208,69 +121,18 @@ class Source:
 
             binned_counts = stats.binned_statistic(time,counts,statistic='sum',bins=bin_edges)[0]
         except Exception as d:
+            raise d
 
-            bin_edges.append(time[-1])
-            binned_counts = stats.binned_statistic(time,counts,statistic='sum',bins=bin_edges)[0]
+            try:
+                bin_edges.append(time[-1])
+                binned_counts = stats.binned_statistic(time,counts,statistic='sum',bins=bin_edges)[0]
+
+            except Exception as e:
+                raise e
 
 
 
         return binned_counts
-
-    def make_fourpanel_plot(self,outdir,binsizes=[500,1000,2000],save=True,show=False,lines=None):
-        name = f'{re.sub(":","",self.position)}_{self.obsid}'
-
-        binned_times_1,binned_counts_1 = self.make_binned_counts(binsizes[0])
-        binned_times_2,binned_counts_2 = self.make_binned_counts(binsizes[1])
-        binned_times_3,binned_counts_3 = self.make_binned_counts(binsizes[2])
-
-        trim_low,trim_high = trimzeros(self.counts)
-        trim_counts = self.counts[trim_low:trim_high]
-        trim_time = self.times[trim_low:trim_high]
-
-        cumo = np.cumsum(trim_counts)
-
-        fig, axs = plt.subplots(2,2)
-        cumo_plt = axs[0,0]
-        bin1_plt = axs[0,1]
-        bin2_plt = axs[1,0]
-        bin3_plt = axs[1,1]
-
-        cumo_plt.plot(trim_time-trim_time[0],cumo)
-        cumo_plt.set_title('Cumulative Counts')
-
-        bin1_plt.step(binned_times_1,binned_counts_1)
-        bin1_plt.set_title(f'Bin sizes: {round(binsizes[0])}')
-
-        bin2_plt.step(binned_times_2,binned_counts_2)
-        bin2_plt.set_title(f'Bin sizes: {round(binsizes[1])}')
-
-        bin3_plt.step(binned_times_3,binned_counts_3)
-        bin3_plt.set_title(f'Bin sizes: {round(binsizes[2])}')
-
-        cumo_plt.set(ylabel='Counts')
-        bin2_plt.set(xlabel='Time (s)',ylabel='Counts')
-        bin3_plt.set(xlabel='Time (s)')
-
-
-        fig.suptitle(name)
-
-        if lines is not None:
-            for ax in axs.flat:
-                ax.vlines(lines,ymin=ax.get_ylim()[0],ymax=ax.get_ylim()[1],colors='r',linestyles='dotted')
-
-        plt.subplots_adjust(hspace=.3)
-
-        if save:
-            fig.savefig(f'{outdir}/{name}_full_lc.png')
-            fig.savefig(f'{outdir}/{name}_full_lc.pdf')
-
-        if show:
-            plt.show()
-
-        plt.close()
-
-        return
-
 
     #true if the low count flare condition is met
     #specifically, if there is at least one 1ks bin which is {threshold} sigma
@@ -282,7 +144,7 @@ class Source:
         if self.total_counts < min_counts or self.count_cut(4):
             return False
 
-        binned_time,binned_list = self.make_binned_counts(1000)
+        binned_list = self.make_binned_counts(1000)
 
         for i in range(len(binned_list)):
             if binned_list[i]>min_counts:
@@ -308,7 +170,7 @@ class Source:
         #first we need to chunk up the data
         #AKA dividing the data into chunks where each chunk is delimitted
         #by the light curve passing through the median of the dataset
-        binned_time,binned_counts = self.make_binned_counts(binsize)
+        binned_counts = self.make_binned_counts(binsize)
         if binned_counts is None:
             return None
 
@@ -401,45 +263,75 @@ p_val: {p_val}
             #convert out to time
             #to do so, we need a trimmed time array
             #just miimic what is done when the binned times are made
+            i = 0
+            while self.counts[i] == 0:
+                i += 1
+            i -= 1
 
+            j = -1
+            while self.counts[j] == 0:
+                j -= 1
+            j +=1
+
+            trimmed_time = self.times[i:j]
+            trimmed_time = [i - self.times[0] for i in trimmed_time]
+            bin_length = int(binsize/3.24014)
+            trimmed_times_binned = [trimmed_time[i] for i in range(len(trimmed_time)) if i%bin_length == 0]
+
+            if debug:
+                print(out)
+                print(len(trimmed_times_binned))
+                print(trimmed_times_binned)
 
             try:
-                detections = [binned_time[index] for sub in out for index in sub]
+                detections = [trimmed_times_binned[index] for sub in out for index in sub]
             except IndexError as e:
-                print('\n\n************\n\n')
-                print('Index error creating detections array')
-
-                #print(out)
-                #print(len(trimmed_times_binned))
+                print(out)
+                print(len(trimmed_times_binned))
                 raise e
 
             self.t_interest.extend(detections)
 
         if debug:
-            print(f'Detections: {detections}')
-            print(f'out:{out}')
-            print(f'Binned counts: {binned_counts}')
-            print(f'Binned times: {binned_time}')
+            print(detections)
+            print(out)
 
         return detections
 
+def analyze_file_alt(file):
+    if __name__ == '__main__':
+        #verbose is an integer, controls the amount of info printed to the screen
+        #0,1,2,3
+        #0 prints no information
+        #1 prints only the number of detections
+        #2 prints every time a detection is made
+        #3 prints all debug information
+        #verbose = int(sys.argv[1])
+        verbose = int(sys.argv[2])
 
-def analyze_file(file,debug,binsize,verbose,galaxy):
+        #binsize in seconds
+        #I default to 500
+        if len(sys.argv) < 4:
+            binsize = 500
+        else:
+            binsize = int(sys.argv[3])
+
+        if verbose > 2:
+            debug = True
+        else:
+            debug = False
+    else:
+        debug = False
+        binsize = 500
+        verbose = 1
+
+
     if 'ascii' in file:
         skip = 0
     else:
         skip = 1
 
-    #get pos and obsid from the file name
-    pos = file.split('/')[-1].split('_')[0].strip('J')
-    obsid = file.split('/')[-1].split('_')[1]
-
-    try:
-        source = Source(lightcurve = np.loadtxt(file, skiprows = skip),obsid=obsid,position=pos)
-
-    except StopIteration as err:
-        return 0
-
+    source = Source(lightcurve = np.loadtxt(file, skiprows = skip))
 
     try:
         detections = source.e_test(binsize = binsize,debug=debug)
@@ -452,7 +344,42 @@ def analyze_file(file,debug,binsize,verbose,galaxy):
             print(f'Detection in {file}, making plot...')
 
         try:
-            source.make_fourpanel_plot(outdir = f'{galaxy}/detections',lines=detections)
+            make_full_plot(file,f'./test/detections',lines=detections)
+        except Exception as e:
+            print(f'Error plotting file {file} with lines {detections}')
+            print(f'Raising error...')
+            raise e
+
+        return 1
+
+    else:
+        return 0
+
+def analyze_file(file,debug,binsize,verbose):
+
+
+    if 'ascii' in file:
+        skip = 0
+    else:
+        skip = 1
+
+    try:
+        source = Source(lightcurve = np.loadtxt(file, skiprows = skip))
+    except StopIteration as err:
+        return 0
+
+    try:
+        detections = source.e_test(binsize = binsize,debug=debug)
+    except Exception as e:
+        print(f'Error in file: {file}\n')
+        raise e
+
+    if detections is not None:
+        if verbose > 1:
+            print(f'Detection in {file}, making plot...')
+
+        try:
+            make_full_plot(file,f'{galaxy}/detections',lines=detections)
         except Exception as e:
             print(f'Error plotting file {file} with lines {detections}')
             print(f'Raising error...')
