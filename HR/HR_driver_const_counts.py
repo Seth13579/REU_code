@@ -65,7 +65,21 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
     run_BEHR(outfile)
 
     print('Making plot...')
-    time,uppers,lowers,meds = plot_BEHR_constcounts(BEHR_outdir,N,position_basic,obsid,evt,src_region,show = True,lines=lines)
+
+    dmextract.punlearn()
+    dmextract.infile = f'{evt}[bin time=::3.24014]'
+    dmextract.clobber = 'yes'
+    dmextract.opt = 'generic'
+    dmextract.outfile = 'temp.fits'
+    dmextract()
+
+    dmlist.punlearn()
+    dmlist.infile = 'temp.fits[cols time]'
+    dmlist.opt = 'data, clean'
+
+    start_time = float(dmlist().splitlines()[1])
+
+    time,uppers,lowers,meds = plot_BEHR_constcounts(BEHR_outdir,N,position_basic,obsid,evt,src_region,show = True,lines=lines,start_time=start_time)
 
 
     print('Saving...')

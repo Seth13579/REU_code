@@ -9,12 +9,14 @@ from run_BEHR import readfile
 import glob
 import sys
 import matplotlib.pyplot as plt
+from ciao_contrib.runtool import *
 #from  extract_counts import unglob
 
 
 #returns an array of soft and an array of hard counts (as ordered)
 #among the +/- N at all times
 def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
+
     dmlist.punlearn()
     dmlist.infile = f'{evt}[sky=region({reg})][cols time, energy]'
     dmlist.opt = 'data,clean'
@@ -163,7 +165,7 @@ def make_behr(evt,srcreg,bkgreg,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N=16)
             writeto.write(f'\n echo "softsrc={soft_src[i]} hardsrc={hard_src[i]}   softbkg={soft_bkg[i]}   hardbkg={hard_bkg[i]}"')
             writeto.write(f'\n./BEHR softsrc={soft_src[i]} hardsrc={hard_src[i]}   softbkg={soft_bkg[i]}   hardbkg={hard_bkg[i]}   softarea={soft_area} hardarea={hard_area} output={BEHR_outdir}/{i}_BEHRresults')
 
-def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,show=False,
+def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,start_time,show=False,
                         save=True,lines=None):
 
     dmlist.punlearn()
@@ -177,7 +179,8 @@ def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,show=False,
         print(x)
         raise e
 
-    x -= x[0]
+
+    x -= start_time
 
     meds = []
     uppers = []
