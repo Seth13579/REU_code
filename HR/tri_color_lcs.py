@@ -3,39 +3,49 @@ import numpy as np
 import glob
 import matplotlib.pyplot as plt
 import os
-from extract_counts import make_regions,unglob
+from extract_counts import make_regions,unglob,download_obsid
 from re import sub
 import sys
 
 #produces the tricolor light curve plot when given the data
 def plot_lc(obsid,pos,time,hards,meds,softs,bin_size,outdir):
     fig,axs = plt.subplots(4,1)
-    soft_plt = axs[0,0]
-    med_plt = axs[1,0]
-    hard_plt = axs[2,0]
-    all_plt = axs[3,0]
+
+    soft_plt = axs[0]
+    med_plt = axs[1]
+    hard_plt = axs[2]
+    all_plt = axs[3]
 
     soft_plt.step(time,softs)
-    soft_plt.set_title(f'Soft light curve \n {bin_size}s bins')
-    soft_plt.set(ylabel='Counts per bin')
+    soft_plt.set_title(f'Soft light curve (.3 to 1 KeV)')
+    soft_plt.xaxis.set_ticklabels([])
+    soft_plt.set(ylabel='Counts/bin')
 
     med_plt.step(time,meds)
-    med_plt.set_title(f'Medium light curve \n {bin_size}s bins')
-    med_plt.set(ylabel='Counts per bin')
+    med_plt.set_title(f'Medium light curve (1 to 2 KeV)')
+    med_plt.xaxis.set_ticklabels([])
+    med_plt.set(ylabel='Counts/bin')
 
     hard_plt.step(time,hards)
-    hard_plt.set_title(f'Medium light curve \n {bin_size}s bins')
-    hard_plt.set(ylabel='Counts per bin')
+    hard_plt.set_title(f'Hard light curve (2 to 7.5 KeV)')
+    hard_plt.xaxis.set_ticklabels([])
+    hard_plt.set(ylabel='Counts/bin')
 
-    all_plt.step(time,softs)
-    all_plt.step(time,meds)
-    all_plt.step(time,hards)
-    all_plt.set_title(f'Combined light curve \n {bin_size}')
-    all_plt.set(ylabel='Counts per bin',xlabel='Time (s)')
+    all_plt.step(time,softs,label='Soft')
+    all_plt.step(time,meds,label='Medium')
+    all_plt.step(time,hards,label='Hard')
+    all_plt.legend()
+    all_plt.set_title(f'Combined light curve')
+    all_plt.set(ylabel='Counts/bin',xlabel='Time (s)')
 
-    fig.suptitle(f'J{pos} -- {obsid}')
 
-    plt.savefig(f'{outdir}/{pos}_{obsid}_tricolor_lc.png',dpi=300)
+    fig.suptitle(f'J{pos} -- ObsID: {obsid}\nBin size: {bin_size}s')
+
+    #fig.set_size_inches(6,10,forward=True)
+
+    plt.subplots_adjust(hspace=.75,top=.85)
+
+    plt.savefig(f'{outdir}/{pos}_{obsid}_{bin_size}s_tricolor_lc.png',dpi=300)
     plt.show()
 
     plt.close()
@@ -82,7 +92,7 @@ def make_tricolor_lc(obsid,primary,position,binsize):
     position_basic = sub('\:','',position)
     working_dir = f'{primary}/{position_basic}'
 
-    make_regions(obsid,position,dir)
+    make_regions(obsid,position,working_dir)
 
     src_region =unglob(glob.glob(f'{working_dir}/*srcreg*'))
     #bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
@@ -94,24 +104,29 @@ def make_tricolor_lc(obsid,primary,position,binsize):
     meds = src_counts['medium']
     hards = src_counts['hard']
 
-    plot_lc(obsid,position_basic,time,hards,meds,softs,bin_size,outdir)
+    time = [i * float(binsize) for i in range(len(softs))]
+
+    plot_lc(obsid,position_basic,time,hards,meds,softs,binsize,working_dir)
 
 
 
 def main():
-    pos = sys.argv[1]
-    obsid = sys.argv[2]
+    if len(sys.argv) == 1:
+        pos = input('Enter position of source: ')
+        obsid = input('Enter obsid of source: ')
+        bin_size = input('Enter bin size in seconds: ')
+
+    else:
+        pos = sys.argv[1]
+        obsid = sys.argv[2]
+        bin_size = sys.argv[3]
+
     dir = f'./{obsid}/primary'
 
-    make_tricolor_lc(obsid,dir,pos,1000)
+    download_obsid(obsid)
 
+    make_tricolor_lc(obsid,dir,pos,bin_size)
 
-
-
-
-
-
-    #make_tricolor_lc(obsid,dir,pos,1000)
 
 if __name__ == '__main__':
     main()

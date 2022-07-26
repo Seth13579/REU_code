@@ -4,9 +4,9 @@ import glob
 import numpy as np
 
 
-def unglob(arr):
+def unglob(arr,force=False):
 
-    if len(arr) > 1:
+    if len(arr) > 1 and not force:
         print('Multiple files found when 1 was expected:')
         print(arr)
         cont = None
@@ -14,9 +14,11 @@ def unglob(arr):
             cont = input('(c)ontinue or (a)bort? ')
         if cont == 'a':
             raise Exception
+
     elif len(arr) == 0:
         print('No files found')
         raise Exception
+
     return str(arr[0]).strip("'[]'")
 
 def download_obsid(obsid):
@@ -27,13 +29,19 @@ def download_obsid(obsid):
 def make_regions(obsid,pos,outroot):
     evt2 = unglob(glob.glob(f'./{obsid}/primary/*evt2*'))
 
-    srcflux.punlearn()
-    srcflux.infile = evt2
-    srcflux.pos = pos
-    srcflux.outroot = outroot
-    srcflux.clobber = 'yes'
-    #srcflux.psfmethod = 'arfcorr'
-    srcflux()
+    try:
+        #no need to run it if the products already exist
+        src_region =unglob(glob.glob(f'{outroot}/*srcreg.fits'),force=True)
+        bkg_region = unglob(glob.glob(f'{outroot}/*bkgreg.fits'),force=True)
+    except:
+
+        srcflux.punlearn()
+        srcflux.infile = evt2
+        srcflux.pos = pos
+        srcflux.outroot = outroot
+        srcflux.clobber = 'yes'
+        #srcflux.psfmethod = 'arfcorr'
+        srcflux()
 
 #returns an array of counts in the selected band
 def split_events(evt,reg,bin_size,band):
