@@ -2,6 +2,7 @@ import numpy as np
 from scipy import stats
 import pickle
 from re import sub
+import os
 
 
 #represents all the observations of a single source
@@ -46,14 +47,54 @@ class Source_All:
 
         return
 
+    def rename(self):
+        '''re initializes the self.name field to match the current self.ra and self.dec'''
+
+        _ra = sub('\:','',self.ra)
+        _dec = sub('\:','',self.dec)
+        self.name = f'J{_ra}{_dec}'
+
+        return
+
+    def optimal_rename(self):
+        '''renames itself to the coordinates of the region within with the lowest error'''
+        #cannot be called if the region field of all source objects in self.obs
+        #do not have their region specified
+
+        best_name = sorted(self.obs, key = lambda x: x.get_a())[0]
+
+        best_pos = best_name.position
+
+        if '+' in best_pos:
+            best_ra = best_pos.split('+')[0]
+            best_dec = '+' + best_pos.split('+')[1]
+
+        else:
+            best_ra = best_pos.split('-')[0]
+            best_dec = '-' + best_pos.split('-')[1]
+
+        self.ra = best_ra
+        self.dec = best_dec
+
+        self.rename()
+
+        return
 
     def save_lcs(self,outdir='.'):
         for source in self.obs:
             lc = source.lightcurve
 
+            filename = f'{outdir}/{self.name}_{source.obsid}_lc.fits.txt'
+
+            try:
+                assert not os.path.exists(filename)
+            except AssertionError as e:
+                print(f'Cannot save textfile {filename}')
+                print(f'File with that name already exists')
+                raise e
+
             header = 'TIME_BIN TIME_MIN TIME TIME_MAX COUNTS STAT_ERR AREA EXPOSURE COUNT_RATE COUNT_RATE_ERR'
-            np.savetxt(f'{outdir}/{self.name}_{source.obsid}_lc.fits.txt', lc,
-                        header=header,fmt='%s',comments='')
+            np.savetxt(filename, lc,header=header,fmt='%s',comments='')
 
 
 
@@ -62,7 +103,7 @@ class Source_All:
 #of a single source.
 class Source:
     def __init__(self, lightcurve=None,obsid=None, position=None,classification=None,
-                t_interest=None, region = None):
+                t_interest=None, region=None, region_object=None):
         #the obsid
         self.obsid = obsid
 
@@ -102,9 +143,23 @@ class Source:
         #found to be happening
         self.t_interest = t_interest
 
-        #option region file describing the source
+        #optional region text describing the source
         self.region = region
 
+        #the region object which created this source
+        self.region_object = region_object
+
+
+    def get_a(self):
+        '''Returns the semimajor axis of the region associated with this source'''
+        if self.region == None:
+            return None
+
+        else:
+            line = self.region
+            a = max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"')
+
+            return a
 
     #returns an unbinned (binned at frame-time) cumulative counts array for the
     #source

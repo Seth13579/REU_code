@@ -5,7 +5,7 @@ import sys
 import os
 import glob
 import numpy as np
-from source_class import Source
+from source_class import Source,Source_All
 from re import sub
 import pandas as pd
 from astropy.io import fits
@@ -57,11 +57,11 @@ class Region:
 
         self.name = f'J{ra_mod}{dec_mod}'
 
-        '''
-        #used by other code, not meant to be interacted with by the user
-        #tracks if the region has been matched to a source
-        self.matched = False
-        '''
+        # a list of match objects corresponding to the matches the region recieved
+        self.matches = None
+
+        #a match object corresponding to the best match the region object recieved
+        self.best_match = None
 
     def make_lc(self,outdir='.'):
 
@@ -109,7 +109,90 @@ class Region:
 
     #method to make a source object from the region object
     def make_source(self):
-        return Source(lightcurve=self.make_lc(),obsid=self.obsid, position=f'{self.ra}{self.dec}')
+        return Source(lightcurve=self.make_lc(),
+                        obsid=self.obsid,
+                        position=f'{self.ra}{self.dec}',
+                        region = self.regtext,
+                        region_object = self)
+
+    def make_new_source(self,all_dict):
+        '''called when no suitable match is found and a new source must be made'''
+        new_source = self.make_source()
+
+        new_source_all = Source_All([new_source],self.ra,self.dec)
+
+        all_dict[new_source_all] = [self]
+
+        return
+
+
+    def apply_match(self, all_dict):
+        '''Called when a match between regions is found to handle the matching process'''
+
+        #the first time this is called, the closest region will be the match
+        if self.best_match is None:
+            self.matches.sort(key = lambda x: x.sep)
+            closest_match = self.matches[0]
+
+            self.best_match = closest_match
+
+        else:
+            current_match_index = self.matches.index(self.best_match)
+
+            try:
+                closest_match = self.matches[current_match_index + 1]
+            except IndexError:
+                for arr in all_dict.values():
+                    try:
+                        assert self not in arr
+                    except AssertionError:
+                        arr.remove(self)
+
+                print('No suitable match, making new source.')
+                self.make_new_source(all_dict)
+
+                self.best_match = None
+
+                return
+
+            self.best_match = closest_match
+
+        obsids_in_closest_match = [x.obsid for x in closest_match.source.obs]
+
+        if self.obsid in obsids_in_closest_match:
+            #test the seperation of both matches:
+            #alt_region is the region which was previously matched to
+            #the source which shares an obsid with self
+
+            alt_source = [x for x in closest_match.source.obs if x.obsid == self.obsid]
+
+            assert len(alt_source) == 1
+
+            alt_source = alt_source[0]
+
+            alt_region = alt_source.region_object
+
+            if self.best_match.sep < alt_region.best_match.sep:
+                closest_match.source.obs.remove(alt_source)
+
+                assert alt_source not in closest_match.source.obs
+
+                closest_match.source.obs.append(self.make_source())
+
+                all_dict[self.best_match.source].append(self)
+
+                #have to re match the alt source
+                alt_region.apply_match(all_dict)
+
+            else:
+                self.apply_match(all_dict)
+
+        else:
+            #make the region into a source and add it to the source_all object
+            closest_match.source.obs.append(self.make_source())
+            all_dict[self.best_match.source].append(self)
+
+        return
 
 def unglob(arr,force=False):
     #force is used to force the program to take the first option of multiple files

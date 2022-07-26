@@ -74,6 +74,9 @@ def process_galaxy(galaxy,raidus,rerun):
     print('Matching regions...')
     all_sources_in_galaxy = galaxy_object.region_match()
 
+    for source in all_sources_in_galaxy:
+        source.optimal_rename()
+
     try:
         os.makedirs('./textfiles')
     except:

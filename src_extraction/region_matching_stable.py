@@ -59,9 +59,8 @@ class Match:
 
         self.sep = seperation(region,matched_region)
 
-
+#class representing all the observations of one galaxy
 class Galaxy:
-    '''class representing all the observations of one galaxy'''
 
     def __init__(self,name,obsid_region_list):
         #the name of the galaxy
@@ -94,8 +93,6 @@ class Galaxy:
         '''
         all_dict = {}
 
-        #error_rate = 0
-        #clean_rate = 0
         for i,region1 in enumerate(mast_region_list):
 
             #an array of Match objects which represent all the matches
@@ -105,40 +102,42 @@ class Galaxy:
             print(f'\nLooking to match a region in ObsID {region1.obsid}, {i+1} of {len(mast_region_list)}:')
             matched = False
 
-            #a debugging tool to learn how many regions are being compared against
-            z = 0
             for source in all_dict.keys():
                 #he list of region objects which correspond to the regions
                 #which make up source
                 test_against = all_dict[source]
 
                 for region2 in test_against:
-                    z += 1
 
                     if match_test(region1,region2):
                         match_array.append(Match(region1,region2,source))
 
-                        matched = True
+                        #add the region to the dictionary so we can later check against it
+                        all_dict[source].append(region1)
 
+                        matched = True
 
             #after we check all the sources, if no match, then we have a new source
             if not matched:
 
                 print('No match, making new source...')
 
-                region1.make_new_source(all_dict)
+                new_source = region1.make_source()
 
-            #if a match is made, append to the source which is the closest match
-            else:
-                region1.matches = match_array
+                new_source_all = Source_All([new_source],region1.ra,region1.dec)
 
-                print(f"{len(region1.matches)} matches found, finding closest and appending...")
+                all_dict[new_source_all] = [region1]
 
-                region1.apply_match(all_dict)
+            #move the appending down here and check the seperations
+            elif matched:
+                print(f"{len(match_array)} matches found, finding closest and appending...")
 
+                #find the closest match
+                match_array.sort(key = lambda x: x.sep)
+                closest_match = match_array[0]
 
-
-            print(f'Region was tested against {z} other regions in total')
+                #make the region into a source and add it to the source_all object
+                closest_match.source.obs.append(region1.make_source())
 
 
 
