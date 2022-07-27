@@ -16,7 +16,7 @@ def unglob(arr,force=False):
             raise Exception
 
     elif len(arr) == 0:
-        print('No files found')
+        #print('No files found')
         raise Exception
 
     return str(arr[0]).strip("'[]'")

@@ -21,12 +21,14 @@ def region_area(events,region,energy):
 #takes as arguments arrays of soft/hard source and background counts, the area ratios, and some file keeping
 def make_behr_file(BEHR_DIR,soft_src,hard_src,soft_bkg,hard_bkg,soft_area,
                     hard_area,outfile,BEHR_outfile):
+    '''
     if os.path.exists(outfile):
         cont = ''
         while 'y' not in cont and 'n' not in cont:
-            cont = input('BEHR outfile exists. Proceeding would overwrite previous work. \n Continue? (y/n): ')
+            cont = input('BEHR outfile exists. Proceeding would overwrite previous work. \nContinue? (y/n): ')
             if 'n' in cont:
                 raise Exception
+    '''
 
     with open(outfile,'w') as writeto:
         writeto.write(f'cd {BEHR_DIR}')

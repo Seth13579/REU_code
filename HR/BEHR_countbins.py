@@ -152,12 +152,14 @@ def make_behr(evt,srcreg,bkgreg,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N=16)
     hard_area = region_area(evt,bkgreg,3000)/region_area(evt,srcreg,3000)
     soft_area = region_area(evt,bkgreg,1000)/region_area(evt,srcreg,1000)
 
+    '''
     if os.path.exists(outfile):
         cont = ''
         while 'y' not in cont and 'n' not in cont:
             cont = input('BEHR outfile exists. Proceeding would overwrite previous work. \n Continue? (y/n): ')
             if 'n' in cont:
                 raise Exception
+    '''
 
     with open(outfile,'w') as writeto:
         writeto.write(f'cd {BEHR_DIR}')
@@ -217,6 +219,8 @@ def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,start_time,show=Fa
 
     if show:
         plt.show()
+
+    plt.close()
 
     return x,uppers,lowers,meds
 

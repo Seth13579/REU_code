@@ -7,7 +7,7 @@ from run_BEHR import *
 from re import sub
 from create_behr_files import region_area
 
-def main(obsid,position,N,lines,divide_energy=2000,override=False):
+def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start=True):
     #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
     #or use:
     BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
@@ -23,7 +23,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
     print('Running srcflux to make regions...')
     make_regions(obsid,position,f'{working_dir}/')
 
-    src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'))
+    src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'),True)
 
     if override:
         print('To avoid background issue, you must draw by hand a background region')
@@ -31,7 +31,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
         print('Make sure to save the region as a fits')
         bkg_region = input('Insert path to hand-drawn region: ')
     else:
-        bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
+        bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
 
     evt = unglob(glob.glob(f'{primary}/*evt2*'))
 
@@ -66,26 +66,31 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False):
 
     print('Making plot...')
 
-    dmextract.punlearn()
-    dmextract.infile = f'{evt}[bin time=::3.24014]'
-    dmextract.clobber = 'yes'
-    dmextract.opt = 'generic'
-    dmextract.outfile = 'temp.fits'
-    dmextract()
+    if subtract_start:
+        dmextract.punlearn()
+        dmextract.infile = f'{evt}[bin time=::3.24014]'
+        dmextract.clobber = 'yes'
+        dmextract.opt = 'generic'
+        dmextract.outfile = 'temp.fits'
+        dmextract()
 
-    dmlist.punlearn()
-    dmlist.infile = 'temp.fits[cols time]'
-    dmlist.opt = 'data, clean'
+        dmlist.punlearn()
+        dmlist.infile = 'temp.fits[cols time]'
+        dmlist.opt = 'data, clean'
 
-    start_time = float(dmlist().splitlines()[1])
+        start_time = float(dmlist().splitlines()[1])
+    else:
+        start_time = 0
 
-    time,uppers,lowers,meds = plot_BEHR_constcounts(BEHR_outdir,N,position_basic,obsid,evt,src_region,show = True,lines=lines,start_time=start_time)
+    time,uppers,lowers,meds = plot_BEHR_constcounts(BEHR_outdir,N,position_basic,obsid,evt,src_region,lines=lines,start_time=start_time,show=True)
 
 
     print('Saving...')
     to_save = np.column_stack((time,meds,uppers,lowers))
 
     np.savetxt(f'./HR_saved_{position}_{obsid}.txt',to_save,delimiter=',',header='Time,Median,Upper Error,Lower Error')
+
+    return to_save
 
 
 
@@ -94,15 +99,27 @@ if __name__ == '__main__':
     position = sys.argv[2]
     N = int(sys.argv[3])
 
+    if len(sys.argv) >= 5:
+        try:
+            divide = float(sys.argv[4])
+        except:
+            divide = 2000
+    else:
+        divide = 2000
 
+
+    '''
     try:
         lines = np.array(sys.argv[4].split(',')).astype('float64')
         if 'bkgoverride' in lines:
             lines = None
     except (IndexError,TypeError,ValueError):
         lines = None
+    '''
+
+    lines = None
 
     if 'bkgoverride' in sys.argv:
-        main(obsid,position,N,lines,override=True)
+        main(obsid,position,N,lines,override=True,divide_energy=divide)
     else:
-        main(obsid,position,N,lines,override=False)
+        main(obsid,position,N,lines,override=False,divide_energy=divide)
