@@ -53,7 +53,7 @@ class Region:
         self.evt = evt
 
         ra_mod = sub('\:','',self.ra)
-        dec_mod = sub('\:','',self.ra)
+        dec_mod = sub('\:','',self.dec)
 
         self.name = f'J{ra_mod}{dec_mod}'
 
@@ -266,11 +266,39 @@ def process_wavdetect(obsid,region_dir,region_file):
         if '-' not in dec and not '+' in dec:
             dec = f'+{dec}'
 
-        return dec
+        dec_pieces = dec.split(':')
+
+        piece_arr = []
+        for i,p in enumerate(dec_pieces):
+            if i == 0:
+                if len(p) != 3 and len(p) != 7:
+                    p = '0' + p
+            else:
+                if len(p) != 2 and len(p) != 7:
+                    p = '0' + p
+
+            piece_arr.append(p)
+
+        return ':'.join(piece_arr)
+
+    def make_ra(line):
+        ra = line[7:].strip('()').split(',')[0]
+
+        ra_pieces = ra.split(':')
+
+        piece_arr = []
+        for p in ra_pieces:
+            if len(p) != 2 and len(p) != 7:
+                p = '0' + p
+
+            piece_arr.append(p)
+
+        return ':'.join(piece_arr)
+
 
     regions = [Region(region_file, #path
                 line, #reg text
-                line[7:].strip('()').split(',')[0], #ra
+                make_ra(line), #ra
                 make_dec(line), #dec
                 max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'), #a
                 min(line[7:].strip('()').split(',')[2], line[7:].strip('()').split(',')[3]).rstrip('"'), #b
@@ -285,7 +313,7 @@ def process_wavdetect(obsid,region_dir,region_file):
 if __name__ == '__main__':
     region_dir = sys.argv[1]
 
-    obsid = '10551_e2'
+    obsid = sys.argv[2]
 
     regions = process_wavdetect(obsid,region_dir,f'{region_dir}/detect_src.fits').all_regions
 
@@ -294,4 +322,5 @@ if __name__ == '__main__':
         print(reg.ra)
         print(reg.dec)
         print(reg.regtext)
+        print(reg.name)
         print('\n')

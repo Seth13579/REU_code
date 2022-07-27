@@ -69,9 +69,12 @@ class Source_All:
             best_ra = best_pos.split('+')[0]
             best_dec = '+' + best_pos.split('+')[1]
 
-        else:
+        elif '-' in best_pos:
             best_ra = best_pos.split('-')[0]
             best_dec = '-' + best_pos.split('-')[1]
+
+        else:
+            raise Exception
 
         self.ra = best_ra
         self.dec = best_dec
