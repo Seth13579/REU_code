@@ -271,8 +271,8 @@ def process_wavdetect(obsid,region_dir,region_file):
         piece_arr = []
         for i,p in enumerate(dec_pieces):
             if i == 0:
-                if len(p) != 3 and len(p) != 7:
-                    p = '0' + p
+                if len(p) != 3:
+                    p = p[0] + '0' + p[1:]
             else:
                 if len(p) != 2 and len(p) != 7:
                     p = '0' + p
