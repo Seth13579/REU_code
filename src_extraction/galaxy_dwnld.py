@@ -24,7 +24,7 @@ def obsid_download(obsid):
 #returns true if the given directory is an interleaved observation
 def check_for_interleaved(dir):
     evt2 = glob.glob(f'{dir}/primary/*evt2*')
-    evt1 = glob.glov(f'{dir}/secondary/*evt1*')
+    evt1 = glob.glob(f'{dir}/secondary/*evt1*')
     if len(evt2) > 1 or len(evt1) > 1:
         return True
     else:
