@@ -15,7 +15,7 @@ def galaxy_download(galaxy,radius):
 
 #downloads the given obsid to the current working directory
 def obsid_download(obsid):
-    os.system('punlearn download_chandra_obsid')
+    #os.system('punlearn download_chandra_obsid')
     os.system(f'download_chandra_obsid {obsid}')
 
     return
@@ -24,7 +24,8 @@ def obsid_download(obsid):
 #returns true if the given directory is an interleaved observation
 def check_for_interleaved(dir):
     evt2 = glob.glob(f'{dir}/primary/*evt2*')
-    if len(evt2) > 1:
+    evt1 = glob.glov(f'{dir}/secondary/*evt1*')
+    if len(evt2) > 1 or len(evt1) > 1:
         return True
     else:
         return False
