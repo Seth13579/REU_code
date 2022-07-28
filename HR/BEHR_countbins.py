@@ -146,7 +146,7 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
     return softs,hards,bkg_softs,bkg_hards
 
 
-def make_behr(evt,srcreg,bkgreg,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N=16):
+def make_behr(evt,srcreg,bkgreg,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N=16,confidence='68.00'):
     soft_src,hard_src,soft_bkg,hard_bkg = constant_count_split(evt,srcreg,bkgreg,divide_energy,N)
 
     hard_area = region_area(evt,bkgreg,3000)/region_area(evt,srcreg,3000)
@@ -165,7 +165,7 @@ def make_behr(evt,srcreg,bkgreg,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N=16)
         writeto.write(f'cd {BEHR_DIR}')
         for i in range(len(soft_src)):
             writeto.write(f'\n echo "softsrc={soft_src[i]} hardsrc={hard_src[i]}   softbkg={soft_bkg[i]}   hardbkg={hard_bkg[i]}"')
-            writeto.write(f'\n./BEHR softsrc={soft_src[i]} hardsrc={hard_src[i]}   softbkg={soft_bkg[i]}   hardbkg={hard_bkg[i]}   softarea={soft_area} hardarea={hard_area} output={BEHR_outdir}/{i}_BEHRresults')
+            writeto.write(f'\n./BEHR softsrc={soft_src[i]} hardsrc={hard_src[i]}   softbkg={soft_bkg[i]}   hardbkg={hard_bkg[i]}   softarea={soft_area} hardarea={hard_area} output={BEHR_outdir}/{i}_BEHRresults level={confidence}')
 
 def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,start_time,show=False,
                         save=True,lines=None):
@@ -201,26 +201,27 @@ def plot_BEHR_constcounts(dir,bin_size,position,obsid,evt,reg,start_time,show=Fa
     lowers = np.array(lowers).astype('float64')
     meds = np.array(meds).astype('float64')
 
-    plt.plot(x,meds,'k-')
-    plt.fill_between(x,lowers,uppers,step='mid')
+    if save or show:
+        plt.plot(x,meds,'k-')
+        plt.fill_between(x,lowers,uppers,step='mid')
 
-    plt.ylabel('(H-S)/(H+S)')
-    plt.xlabel('Time (s)')
-    plt.title(f'HR J{position} ObsID: {obsid} \n Each point ± {bin_size} counts')
+        plt.ylabel('(H-S)/(H+S)')
+        plt.xlabel('Time (s)')
+        plt.title(f'HR J{position} ObsID: {obsid} \n Each point ± {bin_size} counts')
 
-    if lines is not None:
-        ax = plt.gca()
-        min,max = ax.get_ylim()
+        if lines is not None:
+            ax = plt.gca()
+            min,max = ax.get_ylim()
 
-        plt.vlines(lines,ymin=min,ymax=max,colors='r',linestyles='dotted')
+            plt.vlines(lines,ymin=min,ymax=max,colors='r',linestyles='dotted')
 
-    if save:
-        plt.savefig(f'{position}_{obsid}_HR_constcounts.png',dpi=300)
+        if save:
+            plt.savefig(f'{position}_{obsid}_HR_constcounts.png',dpi=300)
 
-    if show:
-        plt.show()
+        if show:
+            plt.show()
 
-    plt.close()
+        plt.close()
 
     return x,uppers,lowers,meds
 

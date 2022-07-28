@@ -115,10 +115,16 @@ class Galaxy:
                 for region2 in test_against:
                     z += 1
 
-                    if match_test(region1,region2):
-                        match_array.append(Match(region1,region2,source))
+                    try:
 
-                        matched = True
+                        if match_test(region1,region2):
+                            match_array.append(Match(region1,region2,source))
+
+                            matched = True
+                    except Exception as e:
+                        print(region1.regtext)
+                        print(region2.regtext)
+                        raise e
 
 
             #after we check all the sources, if no match, then we have a new source
