@@ -15,8 +15,8 @@ def seperation(reg1,reg2):
     dec2 = reg2.dec
 
 
-    c1 = SkyCoord(ra1,dec1,unit=u.deg,frame='fk5')
-    c2 = SkyCoord(ra2,dec2,unit=u.deg,frame='fk5')
+    c1 = SkyCoord(ra1,dec1,unit=(u.hourangle, u.deg),frame='fk5')
+    c2 = SkyCoord(ra2,dec2,unit=(u.hourangle, u.deg),frame='fk5')
 
     return c1.separation(c2).arcsecond
 
