@@ -40,7 +40,7 @@ def run_split(dir):
 
 #splits all interleaved obsids in the current working directory
 def split_interleaved():
-    dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d\d\d',i)]
+    dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d',i)]
 
     for dir in dirs:
         if check_for_interleaved(dir):
@@ -52,7 +52,7 @@ def split_interleaved():
 def repro():
     #regex used to find any directory with at least three digits in a row
     #assuming that these are the obsids
-    dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d\d\d',i)]
+    dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d',i)]
 
     for i,dir in enumerate(dirs):
         os.system('punlearn chandra_repro')
