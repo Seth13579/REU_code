@@ -124,6 +124,7 @@ def process_galaxy(galaxy_name):
     for all_source in all_sources_in_galaxy:
         for source in all_source.obs:
 
+
             if source.classification:
                 evt_dir = f'../{source.obsid}/repro'
 

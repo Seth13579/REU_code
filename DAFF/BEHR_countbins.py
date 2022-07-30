@@ -31,6 +31,7 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
 
 
     times = raw_out[::,0]
+
     energies = raw_out[::,1]
 
     dmlist.punlearn()

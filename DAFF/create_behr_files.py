@@ -3,7 +3,7 @@ import os
 from ciao_contrib.runtool import *
 
 #returns the area of the given region in the given events file at the given energy
-#region can be a region file or the region text, should work with either
+#region can be a region file or the region text, should work with either 
 def region_area(events,region,energy):
 
     try:

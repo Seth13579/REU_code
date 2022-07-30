@@ -1,8 +1,37 @@
 import numpy as np
-from scipy import stats
 import pickle
-from re import sub
+from re import sub,search
+import re
 import os
+import matplotlib.pyplot as plt
+import glob
+import sys
+
+#for the E-test
+from statsmodels.stats.rates import test_poisson_2indep
+
+#HR dependencies
+from extract_counts import *
+from BEHR_countbins import *
+from run_BEHR import *
+from create_behr_files import region_area
+
+def unglob(arr,force=False):
+
+    if len(arr) > 1 and not force:
+        print('Multiple files found when 1 was expected:')
+        print(arr)
+        cont = None
+        while cont != 'c' and cont != 'a':
+            cont = input('(c)ontinue or (a)bort? ')
+        if cont == 'a':
+            raise Exception
+
+    elif len(arr) == 0:
+        #print('No files found')
+        raise Exception
+
+    return str(arr[0]).strip("'[]'")
 
 def bin_array(xs,ys,binsize):
     out_y =  []
@@ -149,13 +178,26 @@ class Source_All:
 #ie, this object represents all the information about a single obersvation
 #of a single source.
 class Source:
-    def __init__(self, lightcurve=None,obsid=None, position=None,classification=None,
+    def __init__(self, lightcurve=None,obsid=None, position=None,classification=False,
                 t_interest=None, region=None, region_object=None):
         #the obsid
         self.obsid = obsid
 
+
         #the position of the source is sexigesimal format
         self.position = position
+
+        name = f'{sub(":","",self.position)}_{self.obsid}'
+        self.name = name
+
+        if '+' in self.position:
+            self.ra = self.position.split('+')[0]
+            self.dec = '+' + self.position.split('+')[1]
+        else:
+            self.ra = self.position.split('-')[0]
+            self.dec = '+' + self.position.split('-')[1]
+
+        self.position_basic = sub('\:','',position)
 
         #lightcurve is a 2D array of the raw lightcurve data read in directly
         #from the light curve files
@@ -166,6 +208,28 @@ class Source:
         #arrays based on the lightcurve
         self.counts = self.lightcurve[::,4]
         self.times = self.lightcurve[::,2]
+
+        #trim the ends off, if they have 0 counts
+        i = 0
+        while self.counts[i] == 0:
+            i += 1
+
+        if self.counts[-1] == 0:
+            #print('Trimming off the end')
+            j = -1
+            while self.counts[j] == 0:
+                j -= 1
+            j +=1
+        else:
+            j = None
+
+        if j is not None:
+            #print(f'Trimming: [{i}:{j}]')
+            self.times = self.times[i:j]
+            self.counts = self.counts[i:j]
+        else:
+            self.times = self.times[i:]
+            self.counts = self.counts[i:]
 
         #total counts
         self.total_counts = sum(self.counts)
@@ -182,8 +246,7 @@ class Source:
         #counts per kilosecond averaged over the observation
         self.count_rate = 1000*self.total_counts/self.duration
 
-        #some method of classifying the interest level in the source
-        #TBD
+        #True if the source is interesting, False otherwise
         self.classification = classification
 
         #all times throughout the observation where something interesting is
@@ -195,6 +258,9 @@ class Source:
 
         #the region object which created this source
         self.region_object = region_object
+
+        #HR information
+        self.HR = None
 
 
     #returns the semimajor axis of the region which made this source
@@ -231,29 +297,8 @@ class Source:
             return None
 
 
-        #trim the ends off, if they have 0 counts
-        i = 0
-        while self.counts[i] == 0:
-            i += 1
-
-        if self.counts[-1] == 0:
-            #print('Trimming off the end')
-            j = -1
-            while self.counts[j] == 0:
-                j -= 1
-            j +=1
-        else:
-            j = None
-
-        if j is not None:
-            #print(f'Trimming: [{i}:{j}]')
-            time = self.times[i:j]
-            counts = self.counts[i:j]
-        else:
-            time = self.times[i:]
-            counts = self.counts[i:]
-
-        time = time - time[0]
+        time = self.times - self.start_time
+        counts = self.counts
 
         binned_times,binned_counts = bin_array(time,counts,binsize)
 
@@ -264,7 +309,11 @@ class Source:
     #makes a four panel light curve for the source
     #one cumulative plot
     #three light curves, defined by the bin sizes in binsizes
-    def make_fourpanel_plot(self,outdir,binsizes=[500,1000,2000],save=True,show=False,lines=None):
+    def make_fourpanel_plot(self,outdir,binsizes=[500,1000,2000],save=True,
+                            show=False,lines=None):
+        if lines == None:
+            lines = self.t_interest
+
         name = f'{re.sub(":","",self.position)}_{self.obsid}'
 
         binned_times_1,binned_counts_1 = self.make_binned_counts(binsizes[0])
@@ -395,6 +444,9 @@ class Source:
             #stat, p_val = stats.mannwhitneyu(chunk,all_others)
 
             if p_val < pthresh:
+                if not self.classification:
+                    self.classification = True
+
                 interesting_chunks.append(i)
 
                 if debug:
@@ -419,11 +471,6 @@ p_val: {p_val}
             #print(interesting_chunks)
 
             out = [[chunk_edges[i],len(binned_counts)-1] if i == len(chunk_edges) - 1 else [chunk_edges[i],chunk_edges[i+1]]for i in interesting_chunks]
-            #print(out)
-
-            #convert out to time
-            #to do so, we need a trimmed time array
-            #just miimic what is done when the binned times are made
 
 
             try:
@@ -436,7 +483,10 @@ p_val: {p_val}
                 #print(len(trimmed_times_binned))
                 raise e
 
-            self.t_interest.extend(detections)
+            if self.t_interest is None:
+                self.t_interest = detections
+            else:
+                self.t_interest.extend(detections)
 
         if debug:
             print(f'Detections: {detections}')
@@ -445,3 +495,124 @@ p_val: {p_val}
             print(f'Binned times: {binned_time}')
 
         return detections
+
+    #produces arrays of information about the source which are to be put into
+    #a csv.
+    def make_csv_line(self):
+        if self.classification:
+            interesting = 'true'
+            interesting_times = ';'.join([str(i) for i in self.t_interest])
+        else:
+            interesting = 'false'
+            interesting_times = ''
+
+        csv_line = [self.name,self.obsid,self.ra,self.dec,self.total_counts,
+                        self.start_time,self.end_time,self.duration,self.count_rate,
+                        interesting,interesting_times]
+
+        return np.array(csv_line)
+
+    #fills in self.HR with HR information following the method of HR_driver_const_counts
+    def make_HR(self,N,evt_dir,errorval='90',divide_energy=2000,override=False,subtract_start=True):
+        # TODO: Write in override
+        '''
+        print(f'NAME: {self.name}')
+        print(f'REGION: {self.region}')
+        sys.exit()
+        '''
+
+        temp_region = 'TEMP.reg'
+
+        with open(temp_region,'w') as file:
+            file.write(self.region)
+
+        working_dir = f'{evt_dir}/{self.position_basic}'
+        try:
+            os.makedirs(working_dir)
+        except:
+            pass
+
+        BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
+        #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
+
+        print('Looking for srcflux products...')
+        try:
+            bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
+        except:
+
+            make_regions(evt_dir,self.position,f'{working_dir}/')
+            bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
+
+        evt = unglob(glob.glob(f'{evt_dir}/*evt2*'))
+
+
+
+        src_region = 'temp_reg.reg'
+
+        with open('temp_reg.reg','w') as f:
+            f.write(self.region)
+
+
+        print('Making BEHR bash file...')
+
+        outfile = f'{working_dir}/BEHR_bash.txt'
+
+        BEHR_outdir = f'{BEHR_DIR}/{self.obsid}/{self.position_basic}'
+
+        subprocess.run(f'rm -rf {BEHR_outdir}',shell=True)
+        os.makedirs(BEHR_outdir)
+
+        make_behr(evt,src_region,bkg_region,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N)
+
+        run_BEHR(outfile)
+
+
+        start_time = self.start_time
+
+
+        time,uppers,lowers,med = plot_BEHR_constcounts(BEHR_outdir,N,self.position_basic,self.obsid,f'./{evt}',src_region,lines=None,start_time=start_time,show=False,save=False)
+
+        time = np.array(time).astype('float64')
+        uppers = np.array(uppers).astype('float64')
+        lowers = np.array(lowers).astype('float64')
+        med = np.array(med).astype('float64')
+
+        self.HR = np.column_stack((time,med,uppers,lowers))
+
+        os.remove('temp_reg.reg')
+
+        return
+
+    #makes a plot of HR and LC, saves it in outdir
+    #control output directory with outdir
+    def plot_HR_and_lc(self,binsize,outdir):
+        time = self.HR[::,0]
+        med = self.HR[::,1]
+        uppers = self.HR[::,2]
+        lowers = self.HR[::,3]
+
+        binned_time,binned_counts = self.make_binned_counts(binsize)
+        print(f'binned_time[0:4]:{binned_time[0:4]}')
+
+        fig,ax = plt.subplots()
+
+        #first plot the lightcurve
+        ax.step(binned_time,binned_counts)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Counts/bin')
+
+        ax2 = ax.twinx()
+        ax2.plot(time,med,'g-')
+        ax2.fill_between(time,lowers,uppers,step='mid',color='g',alpha=.2)
+
+        plt.savefig(f'{self.name}_HR_LC.pdf')
+
+if __name__ == '__main__':
+    lc = np.loadtxt('NGC1313/textfiles/J031822.1213-663603.6133_2950_lc.fits.txt',skiprows=1)
+    regtext='ellipse(03:18:22.2404,-66:36:3.7656,7.06016",5.4328",54.4779)'
+    src = Source(lightcurve=lc,obsid='2950',position='03:18:22.2404-66:36:03.7656',region=regtext)
+    src.make_HR(16,'NGC1313/2950/repro')
+
+    src.plot_HR_and_lc(1000,'.')
+
+    print(src.HR[0,::])
