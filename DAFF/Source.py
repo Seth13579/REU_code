@@ -209,30 +209,32 @@ class Source:
         self.counts = self.lightcurve[::,4]
         self.times = self.lightcurve[::,2]
 
-        #trim the ends off, if they have 0 counts
-        i = 0
-        while self.counts[i] == 0:
-            i += 1
-
-        if self.counts[-1] == 0:
-            #print('Trimming off the end')
-            j = -1
-            while self.counts[j] == 0:
-                j -= 1
-            j +=1
-        else:
-            j = None
-
-        if j is not None:
-            #print(f'Trimming: [{i}:{j}]')
-            self.times = self.times[i:j]
-            self.counts = self.counts[i:j]
-        else:
-            self.times = self.times[i:]
-            self.counts = self.counts[i:]
-
         #total counts
         self.total_counts = sum(self.counts)
+
+        if self.total_counts != 0:
+
+            #trim the ends off, if they have 0 counts
+            i = 0
+            while self.counts[i] == 0:
+                i += 1
+
+            if self.counts[-1] == 0:
+                #print('Trimming off the end')
+                j = -1
+                while self.counts[j] == 0:
+                    j -= 1
+                j +=1
+            else:
+                j = None
+
+            if j is not None:
+                #print(f'Trimming: [{i}:{j}]')
+                self.times = self.times[i:j]
+                self.counts = self.counts[i:j]
+            else:
+                self.times = self.times[i:]
+                self.counts = self.counts[i:]
 
         #start_time is the MJD of the start of the observation
         self.start_time  = self.times[0]
