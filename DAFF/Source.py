@@ -115,7 +115,7 @@ class Source_All:
             self.av_count_rate_nozeros = 0
 
     def save(self,outdir='.'):
-        outfile = f'{outdir}/SOURCE_ALL_{ra}_{dec}.pkl'
+        outfile = f'{outdir}/SOURCE_ALL_{self.name}.pkl'
 
         with open(outfile,'wb') as outp:
             pickle.dump(self, outp)
@@ -580,8 +580,10 @@ p_val: {p_val}
                 #perform the t-test
                 #TODO: Find better fix for one bin chunks than just skipping them
 
-                t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),
-                                sum(all_others),len(all_others),method='etest')
+                try:
+                    t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
+                except Exception as e:
+                    p_val = 1
 
                 if p_val < pthresh:
                     if not self.classification:
@@ -712,8 +714,8 @@ p_val: {p_val}
         except:
             pass
 
-        BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
-        #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
+        #BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
+        BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
 
         print('\nLooking for srcflux products...')
         try:

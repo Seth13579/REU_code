@@ -14,7 +14,6 @@ def subreprocess(dir):
 
     working_dir = f'./{dir}/repro'
 
-    # TODO: Multithread this
     try:
         print("Looking for wavdetect product...")
         wavdetect_region = unglob(glob.glob(f'{working_dir}/*detect_src.reg*'))
@@ -47,7 +46,10 @@ def process_galaxy(galaxy_name):
     for i,dir in enumerate(dirs):
         print(f'\nRunning on {dir}, {i+1} of {len(dirs)}')
 
-        new = subreprocess(dir)
+        try:
+            new = subreprocess(dir)
+        except:
+            new = None
 
         if new is not None:
             all_regions_in_galaxy.append(new)
@@ -149,12 +151,14 @@ if __name__ == '__main__':
     #or use 'all' to run on all dirs in cwd
 
     if 'all' in sys.argv[1] or 'ALL' in sys.argv[1] or 'All' in sys.argv[1]:
-        galaxies = os.listdir(os.getcwd())
+        galaxies = [i for i in os.listdir(os.getcwd()) if '.txt' not in i and i != 'NGC5194']
 
     else:
         galaxies = sys.argv[1].split(',')
 
     errors = []
+
+    cwd = os.getcwd()
 
     for i,galaxy in enumerate(galaxies):
         print('***********')
@@ -163,8 +167,11 @@ if __name__ == '__main__':
 
         try:
             process_galaxy(galaxy)
-        except:
+        except Exception as e:
             errors.append(galaxy)
+            raise e
+
+        os.chdir(cwd)
 
     with open('Error_doc.txt','w') as f:
         for gal in errors:
