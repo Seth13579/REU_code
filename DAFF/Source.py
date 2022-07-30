@@ -535,10 +535,11 @@ p_val: {p_val}
         BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
         #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
 
-        print('Looking for srcflux products...')
+        print('\nLooking for srcflux products...')
         try:
             bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
         except:
+            print('None found, running srcflux...')
 
             make_regions(evt_dir,self.position,f'{working_dir}/')
             bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
@@ -592,7 +593,6 @@ p_val: {p_val}
         lowers = self.HR[::,3]
 
         binned_time,binned_counts = self.make_binned_counts(binsize)
-        print(f'binned_time[0:4]:{binned_time[0:4]}')
 
         fig,ax = plt.subplots()
 

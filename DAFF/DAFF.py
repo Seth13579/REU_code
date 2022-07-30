@@ -29,9 +29,6 @@ def subreprocess(dir):
 
     return all_regions_in_obsid
 
-
-
-
 #carrys out the steps of region making and matching to create a galaxy class object
 #assumes that the data is downloaded and reprocessed
 #then produces textfiles in ./{galaxy}/textfiles
@@ -124,12 +121,25 @@ def process_galaxy(galaxy_name):
     for all_source in all_sources_in_galaxy:
         for source in all_source.obs:
 
-
             if source.classification:
                 evt_dir = f'../{source.obsid}/repro'
 
                 source.make_HR(16,evt_dir)
                 source.plot_HR_and_lc(1000,'.')
+
+    ###########################
+    ###########################
+    print('Saving sources...')
+    os.chdir('../')
+    try:
+        os.makedirs('./sources')
+    except:
+        pass
+    os.chdir('./sources')
+
+    for all_source in all_sources_in_galaxy:
+        all_source.save()
+
 
     return
 
