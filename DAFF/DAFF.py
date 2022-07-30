@@ -140,7 +140,6 @@ def process_galaxy(galaxy_name):
     for all_source in all_sources_in_galaxy:
         all_source.save()
 
-
     return
 
 if __name__ == '__main__':
