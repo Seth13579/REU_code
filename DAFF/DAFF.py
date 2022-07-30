@@ -151,20 +151,21 @@ if __name__ == '__main__':
     if 'all' in sys.argv[1] or 'ALL' in sys.argv[1] or 'All' in sys.argv[1]:
         galaxies = os.listdir(os.getcwd())
 
-        errors = []
-
-        for i,galaxy in enumerate(galaxies):
-            print('***********')
-            print(f'PROCESSING {galaxy}, {i+1} OF {len(galaxies)}')
-            print('***********')
-
-            try:
-                process_galaxy(galaxy)
-            except:
-                errors.append(galaxy)
-
-        with open('Error_doc.txt','w') as f:
-            for gal in errors:
-                f.write(gal)
     else:
         galaxies = sys.argv[1].split(',')
+
+    errors = []
+
+    for i,galaxy in enumerate(galaxies):
+        print('***********')
+        print(f'PROCESSING {galaxy}, {i+1} OF {len(galaxies)}')
+        print('***********')
+
+        try:
+            process_galaxy(galaxy)
+        except:
+            errors.append(galaxy)
+
+    with open('Error_doc.txt','w') as f:
+        for gal in errors:
+            f.write(gal)
