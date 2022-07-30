@@ -89,7 +89,7 @@ def process_galaxy(galaxy_name):
     lines = []
     for all_source in all_sources_in_galaxy:
         for source in all_source.obs:
-            source.t_interest = source.e_test(binsize=500)
+            source.t_interest = source.e_test_repeat(binsize=500)
 
             if source.classification:
                 source.make_fourpanel_plot(outdir='.')
