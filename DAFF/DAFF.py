@@ -135,6 +135,7 @@ def process_galaxy(galaxy_name):
         os.makedirs('./sources')
     except:
         pass
+    os.system('rm ./sources/*.pkl')
     os.chdir('./sources')
 
     for all_source in all_sources_in_galaxy:
@@ -143,4 +144,6 @@ def process_galaxy(galaxy_name):
     return
 
 if __name__ == '__main__':
-    process_galaxy('NGC1313')
+    galaxies = os.listdir(os.getcwd())
+
+    print(galaxies)
