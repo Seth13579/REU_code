@@ -85,13 +85,22 @@ def process_galaxy(galaxy_name):
         pass
     os.chdir('./detections_lcs')
 
+    return
+
     ###########################
     ###########################
     print('\nDetecting dips and flares...')
     lines = []
+    total = len([source for all_source in all_sources_in_galaxy for source in all_source.obs])
+    i = 0
     for all_source in all_sources_in_galaxy:
         for source in all_source.obs:
-            source.t_interest = source.e_test_repeat(binsize=500)
+
+            try:
+                source.t_interest = source.e_test_repeat(binsize=1000)
+            except:
+                source.t_interest = None
+                source.classification = False
 
             if source.classification:
                 source.make_fourpanel_plot(outdir='.')
@@ -99,6 +108,8 @@ def process_galaxy(galaxy_name):
             csv_line = source.make_csv_line()
 
             lines.append(csv_line)
+
+            i += 1
 
     ###########################
     ###########################
@@ -126,8 +137,11 @@ def process_galaxy(galaxy_name):
             if source.classification:
                 evt_dir = f'../{source.obsid}/repro'
 
-                source.make_HR(16,evt_dir)
-                source.plot_HR_and_lc(1000,'.')
+                try:
+                    source.make_HR(16,evt_dir)
+                    source.plot_HR_and_lc(1000,'.')
+                except:
+                    pass
 
     ###########################
     ###########################
@@ -169,9 +183,11 @@ if __name__ == '__main__':
             process_galaxy(galaxy)
         except Exception as e:
             errors.append(galaxy)
-            raise e
-
-        os.chdir(cwd)
+            os.chdir(cwd)
+            os.system('mv {galaxy} ../../errored')
+        else:
+            os.chdir(cwd)
+            os.system(f'mv {galaxy} ../../completed')
 
     with open('Error_doc.txt','w') as f:
         for gal in errors:

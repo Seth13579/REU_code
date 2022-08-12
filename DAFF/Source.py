@@ -366,7 +366,7 @@ class Source:
         if show:
             plt.show()
 
-        plt.close()
+        plt.close('all')
 
         return
 
@@ -569,6 +569,9 @@ p_val: {p_val}
                 #flatten all_others
                 all_others = [bin for sub in all_others for bin in sub]
 
+                if len(chunk) == 0 or len(all_others) == 0:
+                    continue
+
                 #if there is a flare, we don't want to consider it if it has fewer than 10 counts
                 if np.mean(chunk) > np.mean(all_others) and sum(chunk) < 10:
                     continue
@@ -627,11 +630,18 @@ p_val: {p_val}
         interesting_chunks = []
         detections = []
 
+        z = 0
+
         while repeat:
+            z += 1
+
 
             new_chunk = find_best_chunk(chunks)
 
             if new_chunk:
+                if z > 5:
+                    repeat = False
+
                 interesting_chunks.append(new_chunk)
                 i = new_chunk
 
