@@ -185,9 +185,11 @@ if __name__ == '__main__':
             errors.append(galaxy)
             os.chdir(cwd)
             os.system('mv {galaxy} ../../errored')
+            #NEEDS TO BE CHANGED TO WORK WITH YOUR FILE TREE
         else:
             os.chdir(cwd)
             os.system(f'mv {galaxy} ../../completed')
+            #NEEDS TO BE CHANGED TO WORK WITH YOUR FILE TREE
 
     with open('Error_doc.txt','w') as f:
         for gal in errors:
