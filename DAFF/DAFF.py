@@ -85,8 +85,6 @@ def process_galaxy(galaxy_name):
         pass
     os.chdir('./detections_lcs')
 
-    return
-
     ###########################
     ###########################
     print('\nDetecting dips and flares...')
@@ -174,6 +172,16 @@ if __name__ == '__main__':
 
     cwd = os.getcwd()
 
+    try:
+        os.makedirs('./errored')
+    except:
+        pass
+
+    try:
+        os.makedirs('./completed')
+    except:
+        pass
+
     for i,galaxy in enumerate(galaxies):
         print('***********')
         print(f'PROCESSING {galaxy}, {i+1} OF {len(galaxies)}')
@@ -184,10 +192,12 @@ if __name__ == '__main__':
         except Exception as e:
             errors.append(galaxy)
             os.chdir(cwd)
-            os.system('mv {galaxy} ../../errored')
+            os.system(f'mv {galaxy} ./errored')
+            print(f'{galaxy} erroed, moved to ./errored')
         else:
             os.chdir(cwd)
-            os.system(f'mv {galaxy} ../../completed')
+            os.system(f'mv {galaxy} ./completed')
+            print(f'{galaxy} completed without error, moved to ./completed')
 
     with open('Error_doc.txt','w') as f:
         for gal in errors:

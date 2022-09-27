@@ -16,6 +16,10 @@ from BEHR_countbins import *
 from run_BEHR import *
 from create_behr_files import region_area
 
+def load_src_all(file):
+    with open(file,'rb') as f:
+        return pickle.load(f)
+
 def unglob(arr,force=False):
 
     if len(arr) > 1 and not force:
@@ -156,6 +160,10 @@ class Source_All:
 
         self.rename()
 
+        #also have to update the parent names in each of the child objects
+        for src in self.obs:
+            src.parent_name = f'{sub(":","",self.ra)}{sub(":","",self.dec)}_{src.obsid}'
+
         return
 
     def save_lcs(self,outdir='.'):
@@ -179,7 +187,7 @@ class Source_All:
 #of a single source.
 class Source:
     def __init__(self, lightcurve=None,obsid=None, position=None,classification=False,
-                t_interest=None, region=None, region_object=None):
+                t_interest=None, region=None, region_object=None, parent=None):
         #the obsid
         self.obsid = obsid
 
@@ -264,6 +272,16 @@ class Source:
         #HR information
         self.HR = None
 
+        #parent is the parent Source_All object to which this source belongs
+        #even if unset, will auto update to the correct name when
+        #the optimal_rename routine is run in the parent
+        self.parent = parent
+
+        if self.parent is not None:
+            self.parent_name = f'{sub(":","",self.parent.ra)}{sub(":","",self.parent.dec)}_{self.obsid}'
+        else:
+            self.parent_name = None
+
 
     #returns the semimajor axis of the region which made this source
     def get_a(self):
@@ -316,7 +334,10 @@ class Source:
         if lines == None:
             lines = self.t_interest
 
-        name = f'{re.sub(":","",self.position)}_{self.obsid}'
+        if self.parent_name is not None:
+            name = f'{self.parent_name}_{self.obsid}'
+        else:
+            name = f'{self.name}_{self.obsid}'
 
         binned_times_1,binned_counts_1 = self.make_binned_counts(binsizes[0])
         binned_times_2,binned_counts_2 = self.make_binned_counts(binsizes[1])
@@ -698,9 +719,14 @@ p_val: {p_val}
             interesting = 'false'
             interesting_times = ''
 
-        csv_line = [self.name,self.obsid,self.ra,self.dec,self.total_counts,
-                        self.start_time,self.end_time,self.duration,self.count_rate,
-                        interesting,interesting_times]
+        if self.parent_name is not None:
+            csv_line = [self.parent_name,self.obsid,self.ra,self.dec,self.total_counts,
+                            self.start_time,self.end_time,self.duration,self.count_rate,
+                            interesting,interesting_times]
+        else:
+            csv_line = [self.name,self.obsid,self.ra,self.dec,self.total_counts,
+                            self.start_time,self.end_time,self.duration,self.count_rate,
+                            interesting,interesting_times]
 
         return np.array(csv_line)
 
@@ -724,8 +750,8 @@ p_val: {p_val}
         except:
             pass
 
-        #BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
-        BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
+        BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
+        #BEHR_DIR = '/data/reu/slarner/BEHR_contain/BEHR'
 
         print('\nLooking for srcflux products...')
         try:
@@ -797,7 +823,10 @@ p_val: {p_val}
         ax2.plot(time,med,'g-')
         ax2.fill_between(time,lowers,uppers,step='mid',color='g',alpha=.2)
 
-        plt.savefig(f'{self.name}_HR_LC.pdf')
+        if self.parent_name is not None:
+            plt.savefig(f'{self.parent_name}_HR_LC.pdf')
+        else:
+            plt.savefig(f'{self.name}_HR_LC.pdf')
 
 if __name__ == '__main__':
     lc = np.loadtxt('test_lc.txt',skiprows=1)

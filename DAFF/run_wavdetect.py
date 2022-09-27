@@ -11,6 +11,7 @@ import pandas as pd
 from astropy.io import fits
 from astropy.table import Table
 
+
 #a class representing all the regions in a given observation
 class Obsid_all_regions:
 
@@ -108,18 +109,22 @@ class Region:
         return lc
 
     #method to make a source object from the region object
-    def make_source(self):
+    def make_source(self,parent=None):
+        #if parent is known, can specify it here
         return Source(lightcurve=self.make_lc(),
                         obsid=self.obsid,
                         position=f'{self.ra}{self.dec}',
                         region = self.regtext,
-                        region_object = self)
+                        region_object = self,
+                        parent = parent)
 
     def make_new_source(self,all_dict):
         '''called when no suitable match is found and a new source must be made'''
         new_source = self.make_source()
 
         new_source_all = Source_All([new_source],self.ra,self.dec)
+
+        new_source.parent = new_source_all
 
         all_dict[new_source_all] = [self]
 
@@ -177,7 +182,7 @@ class Region:
 
                 assert alt_source not in closest_match.source.obs
 
-                closest_match.source.obs.append(self.make_source())
+                closest_match.source.obs.append(self.make_source(parent = closest_match.source))
 
                 all_dict[self.best_match.source].append(self)
 
@@ -189,7 +194,7 @@ class Region:
 
         else:
             #make the region into a source and add it to the source_all object
-            closest_match.source.obs.append(self.make_source())
+            closest_match.source.obs.append(self.make_source(parent = closest_match.source))
             all_dict[self.best_match.source].append(self)
 
         return
@@ -213,6 +218,7 @@ def unglob(arr,force=False):
 
 def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an obsid
     #needs a level 2 directory with a chandra evt2 file
+
     fluximage.punlearn()
     evt = glob.glob(f'{dir}/*evt2*')
     evt = unglob(evt,True)
