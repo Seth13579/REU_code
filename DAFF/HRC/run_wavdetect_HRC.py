@@ -224,7 +224,7 @@ def detect(dir):#detect is used to run fluximage and wavdetect in sequence on an
     evt = unglob(evt,True)
     fluximage.infile= evt
     fluximage.outroot = f'{dir}/detect'
-    fluximage.bands = '0.3:7.5:2.3'
+    fluximage.bands = 'wide'
     fluximage.psfecf=0.9 #one sigma of 2D gaussian (see 'running wavdetect')
     fluximage.clobber = 'yes'
     fluximage()
