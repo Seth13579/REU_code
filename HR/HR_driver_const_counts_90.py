@@ -20,17 +20,16 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     position_basic = sub('\:','',position)
     working_dir = f'{primary}/{position_basic}'
 
-    print('Running srcflux to make regions...')
-    make_regions(obsid,position,f'{working_dir}/')
-
-    src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'),True)
-
     if override:
-        print('To avoid background issue, you must draw by hand a background region')
-        print('Please do that now and then input the absolute path to that region below')
-        print('Make sure to save the region as a fits')
-        bkg_region = input('Insert path to hand-drawn region: ')
+        src_region = input('Enter path to src region file: ').strip()
+        bkg_region = input('Enter path to bkg region file: ').strip()
+
     else:
+        print('Running srcflux to make regions...')
+        #If not overriden, we make the regions with src flux
+        make_regions(obsid,position,f'{working_dir}/')
+
+        src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'),True)
         bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
 
     evt = unglob(glob.glob(f'{primary}/*evt2*'))
@@ -40,7 +39,15 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     #corresponding background region will be far far too large
     #I am going to detect this by comparing the area of each
 
-    area = region_area(evt,bkg_region,1000)/region_area(evt,src_region,1000)
+    try:
+
+        area = region_area(evt,bkg_region,1000)/region_area(evt,src_region,1000)
+    except Exception as e:
+        print('If OSError because the virtual file for a region could not be opened')
+        print('Remember to save the bkg region in ciao format instead of ds9')
+        print('Talk me if you need help')
+
+        raise e
 
     try:
         assert area < 50
@@ -99,7 +106,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
 
     plt.plot(time_68,meds_68,'k-')
     plt.fill_between(time_90,lowers_90,uppers_90,step='mid',color='g')
-    plt.fill_between(time_68,lowers_68,uppers_68,step='mid',color='b')    
+    plt.fill_between(time_68,lowers_68,uppers_68,step='mid',color='b')
 
     plt.ylabel('(H-S)/(H+S)')
     plt.xlabel('Time (s)')
@@ -120,10 +127,14 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     return (to_save_68,to_save_90)
 
 if __name__ == '__main__':
+    print('Remember to change the BEHR_DIR paramter located in this file to where your BEHR instillation is located.')
+
     obsid = sys.argv[1]
     position = sys.argv[2]
     N = int(sys.argv[3])
 
+    #can manually enter an energy to divide hard and soft as the last command
+    #line paramter
     if len(sys.argv) >= 5:
         try:
             divide = float(sys.argv[4])
@@ -132,19 +143,12 @@ if __name__ == '__main__':
     else:
         divide = 2000
 
-
-    '''
-    try:
-        lines = np.array(sys.argv[4].split(',')).astype('float64')
-        if 'bkgoverride' in lines:
-            lines = None
-    except (IndexError,TypeError,ValueError):
-        lines = None
-    '''
+    override = input('Override regions (be asked to enter your own regions instead of making them automatically)  [y/n]? ')
+    if 'y' in override:
+        override = True
+    else:
+        override = False
 
     lines = None
 
-    if 'bkgoverride' in sys.argv:
-        main(obsid,position,N,lines,override=True,divide_energy=divide)
-    else:
-        main(obsid,position,N,lines,override=False,divide_energy=divide)
+    main(obsid,position,N,lines,override=override,divide_energy=divide)
