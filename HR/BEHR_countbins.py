@@ -132,12 +132,6 @@ def constant_count_split(evt,reg,bkgreg,divide_energy,N=16):
     bkg_softs = np.array(bkg_softs).astype('int')
     bkg_hards = np.array(bkg_hards).astype('int')
 
-    bkg_soft_nonzero = [i for i in bkg_softs if i != 0]
-    bkg_hard_nonzero = [i for i in bkg_hards if i != 0]
-
-    assert len(bkg_soft_nonzero) != 0
-    assert len(bkg_hard_nonzero) != 0
-
     all = np.column_stack((softs,hards,bkg_softs,bkg_hards))
 
     np.save('debugging.npy',all)
