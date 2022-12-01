@@ -6,9 +6,6 @@ import os
 import matplotlib.pyplot as plt
 import glob
 import sys
-import gc
-from astropy.stats import bayesian_blocks
-import warnings
 
 #for the E-test
 from statsmodels.stats.rates import test_poisson_2indep
@@ -125,7 +122,7 @@ class Source_All:
         outfile = f'{outdir}/SOURCE_ALL_{self.name}.pkl'
 
         with open(outfile,'wb') as outp:
-            pickle.dump(self, outp,protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self, outp)
 
         return
 
@@ -169,19 +166,18 @@ class Source_All:
 
         return
 
-    def save_lcs(self,outdir='.',clobber = False):
+    def save_lcs(self,outdir='.'):
         for source in self.obs:
             lc = source.lightcurve
 
             filename = f'{outdir}/{self.name}_{source.obsid}_lc.fits.txt'
 
-            if not clobber:
-                try:
-                    assert not os.path.exists(filename)
-                except AssertionError as e:
-                    print(f'Cannot save textfile {filename}')
-                    print(f'File with that name already exists')
-                    raise e
+            try:
+                assert not os.path.exists(filename)
+            except AssertionError as e:
+                print(f'Cannot save textfile {filename}')
+                print(f'File with that name already exists')
+                raise e
 
             header = 'TIME_BIN TIME_MIN TIME TIME_MAX COUNTS STAT_ERR AREA EXPOSURE COUNT_RATE COUNT_RATE_ERR'
             np.savetxt(filename, lc,header=header,fmt='%s',comments='')
@@ -190,7 +186,7 @@ class Source_All:
 #ie, this object represents all the information about a single obersvation
 #of a single source.
 class Source:
-    def __init__(self, lightcurve=None,obsid=None, position=None,classification=False,
+    def __init__(self, lightcurve=None,obsid=None, position=None,classification={},
                 t_interest=None, region=None, region_object=None, parent=None):
         #the obsid
         self.obsid = obsid
@@ -336,8 +332,8 @@ class Source:
     #one cumulative plot
     #three light curves, defined by the bin sizes in binsizes
     def make_fourpanel_plot(self,outdir,binsizes=[500,1000,2000],save=True,
-                            show=False,lines=None, highlight=None):
-        if lines is None:
+                            show=False,lines=None):
+        if lines == None:
             lines = self.t_interest
 
         if self.parent_name is not None:
@@ -345,11 +341,7 @@ class Source:
         else:
             name = f'{self.name}_{self.obsid}'
 
-        try:
-            binned_times_1,binned_counts_1 = self.make_binned_counts(binsizes[0])
-        except TypeError as e:
-            print(self.name)
-            raise e
+        binned_times_1,binned_counts_1 = self.make_binned_counts(binsizes[0])
         binned_times_2,binned_counts_2 = self.make_binned_counts(binsizes[1])
         binned_times_3,binned_counts_3 = self.make_binned_counts(binsizes[2])
 
@@ -369,13 +361,13 @@ class Source:
         cumo_plt.plot(trim_time-trim_time[0],cumo)
         cumo_plt.set_title('Cumulative Counts')
 
-        bin1_plt.step(binned_times_1,binned_counts_1,where='mid')
+        bin1_plt.step(binned_times_1,binned_counts_1)
         bin1_plt.set_title(f'Bin sizes: {round(binsizes[0])}')
 
-        bin2_plt.step(binned_times_2,binned_counts_2,where='mid')
+        bin2_plt.step(binned_times_2,binned_counts_2)
         bin2_plt.set_title(f'Bin sizes: {round(binsizes[1])}')
 
-        bin3_plt.step(binned_times_3,binned_counts_3,where='mid')
+        bin3_plt.step(binned_times_3,binned_counts_3)
         bin3_plt.set_title(f'Bin sizes: {round(binsizes[2])}')
 
         cumo_plt.set(ylabel='Counts')
@@ -389,12 +381,6 @@ class Source:
             for ax in axs.flat:
                 ax.vlines(lines,ymin=ax.get_ylim()[0],ymax=ax.get_ylim()[1],colors='r',linestyles='dotted')
 
-        if highlight is not None:
-            for ax in axs.flat:
-                lim = ax.get_ylim()
-                for i in np.arange(0,len(highlight),2):
-                    ax.fill_betweenx(y=lim,x1=highlight[i],x2=highlight[i+1],alpha=.3,color='green')
-
         plt.subplots_adjust(hspace=.3)
 
         if save:
@@ -404,8 +390,12 @@ class Source:
         if show:
             plt.show()
 
-
-        plt.close()
+        '''
+        plt.close(fig)
+        plt.cla()
+        plt.clf()
+        '''
+        #testing not including those lines to prevent memory leak
 
         return
 
@@ -477,16 +467,12 @@ class Source:
             elif np.mean(chunk) < np.mean(all_others) and self.total_counts < 30:
                 continue
 
-            #perform the t-test
-            #TODO: Find better fix for one bin chunks than just skipping them
 
             t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
 
-            #stat, p_val = stats.mannwhitneyu(chunk,all_others)
 
             if p_val < pthresh:
-                if not self.classification:
-                    self.classification = True
+                self.classification[binsize] = True
 
                 interesting_chunks.append(i)
 
@@ -507,6 +493,10 @@ p_val: {p_val}
 
 
         if not interesting_chunks:
+            #if there are no interesting chunks the classification dictionary is updated
+            #to show false for this binsize
+            self.classification[binsize] = False
+
             return None
         else:
             #print(interesting_chunks)
@@ -626,8 +616,7 @@ p_val: {p_val}
                     p_val = 1
 
                 if p_val < pthresh:
-                    if not self.classification:
-                        self.classification = True
+                    self.classification[binsize] = True
 
                     interesting_chunks[i] = p_val
 
@@ -647,7 +636,10 @@ p_val: {p_val}
     ''')
 
             #if there aren't interesting chunks, return None
+            #and update the dictionary to track that no interesting things
+            #were found at this bin size
             if not interesting_chunks:
+                self.classification[binsize] = False
                 return None
 
             #pick out the lowest p-value from among the interesting chunks
@@ -723,424 +715,6 @@ p_val: {p_val}
             print(f'out:{out}')
             print(f'Binned counts: {binned_counts}')
             print(f'Binned times: {binned_time}')
-
-        return detections
-
-    #the same as the above but the chunks are made with Bayesian blocks
-    def e_test_repeat_blocks(self,pthresh=2.867E-7,binsize=1000, debug = False):
-
-        #default pthresh set to 5 sigma detection level
-
-        if self.total_counts < 3:
-            return None
-
-        #first we need to chunk up the data
-        #AKA dividing the data into chunks where each chunk is delimitted
-        #by the light curve passing through the median of the dataset
-        binned_time,binned_counts = self.make_binned_counts(binsize)
-
-        t0 = binned_time[0]
-
-        if binned_counts is None:
-            return None
-
-        #takes the binned counts array and turns it into chunks using the
-        #bayesian blocks algorithm
-        #returns the edges of the chunks, the chunks themselves
-        def make_chunks(binned_counts):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                chunk_edges = bayesian_blocks(binned_time,binned_counts,fitness='events',p0=0.001)
-
-
-            #convert the chunk_edges from time space to index space
-            chunk_edges = np.array(chunk_edges)/t0 - 1
-            chunk_edges = chunk_edges[:-1]
-
-            #turning the chunk edges into the chunks themselves
-            #chunks are an array of sub arrays,
-            #each sub array is a list of the values of binned_counts in the chunk
-
-            #initialize the array of empty sub arrays
-            chunks = [[] for i in range(len(chunk_edges))]
-
-            for i,val in enumerate(binned_counts):
-                for j,edge in enumerate(chunk_edges):
-
-                    if edge == chunk_edges[-1]:
-                        chunks[j].append(val)
-                        break
-                    else:
-                        if i >= chunk_edges[j] and i < chunk_edges[j+1]:
-                            chunks[j].append(val)
-                            break
-
-            return (chunk_edges,chunks)
-
-        chunk_edges,chunks = make_chunks(binned_counts)
-        if debug:
-            print(chunk_edges)
-            print('\n')
-            print(chunks)
-            print(len(binned_counts))
-            chunk_edges_times = (chunk_edges+1)*t0
-            #return [(index+1)*t0 for index in chunk_edges]
-
-        #when given the array of chunks, applies the e_test and returns the
-        #chunk with the lowest probability among all chunks which are significant
-        def find_best_chunk(chunks):
-            #initialize the dict of interesting chunks which pass the significance test
-            #key will be the index of the chunk
-            #value will be the p_value
-            interesting_chunks = {}
-
-            #Loop through all the chunks, for each testing if the mean inside the chunk
-            #is significantly different than the mean outside of it
-            #interesting chunks get added to interesting_chunks
-            for i,chunk in enumerate(chunks):
-                #build all_others, an array which contains all the chunks beside the
-                #one being examined
-                if i == 0:
-                    all_others = chunks[1:]
-                else:
-                    all_others = chunks[:i]
-                    seg2 = chunks[i+1:]
-
-                    all_others.extend(seg2)
-
-                #flatten all_others
-                all_others = [bin for sub in all_others for bin in sub]
-
-                if len(chunk) == 0 or len(all_others) == 0:
-                    continue
-
-                #if there is a flare, we don't want to consider it if it has fewer than 10 counts
-                if np.mean(chunk) > np.mean(all_others) and sum(chunk) < 10:
-                    continue
-                #if there is a dip, we don't want to consider it if the observation
-                #has fewer than 30 counts
-                elif np.mean(chunk) < np.mean(all_others) and self.total_counts < 30:
-                    continue
-
-
-                try:
-                    t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
-                except Exception as e:
-                    p_val = 1
-
-                if p_val < pthresh:
-                    if not self.classification:
-                        self.classification = True
-
-                    interesting_chunks[i] = p_val
-
-                    if debug:
-                        print(f'''Detection in chunk {i}
-    This chunk: {chunk}
-    all_others: {all_others}
-    p_val: {p_val}
-    ''')
-
-                else:
-                    if debug:
-                        print(f'''No detection in chunk {i}
-    This chunk: {chunk}
-    all_others: {all_others}
-    p_val: {p_val}
-    ''')
-
-            #if there aren't interesting chunks, return None
-            if not interesting_chunks:
-                return None
-
-            #pick out the lowest p-value from among the interesting chunks
-            interesting_chunks_sorted = {k: v for k, v in sorted(interesting_chunks.items(), key=lambda item: item[1])}
-            lowest_p = next(iter(interesting_chunks_sorted.values()))
-            best_chunk = next(iter(interesting_chunks_sorted.keys()))
-
-            if debug:
-                print(f'Of {len(interesting_chunks.keys())} detections, the most interesting is chunk {best_chunk} with p-val {interesting_chunks[best_chunk]}')
-
-            return best_chunk
-
-        repeat = True
-
-
-        interesting_chunks = []
-        detections = []
-
-        z = 0
-
-        #Steps:
-            #1: run find_best_chunk to find the chunk which is the most significant
-            #2a: If there is no significant chunk, stop
-            #2b: If there is a significant chunk, add it to the list of interesting chunks
-            #and add the corresponding times to detections
-            #3: delete the chunk from the binned counts array
-            #4a: If this process has been repeated 5 times already, stop
-            #4b: Otherwise, repeat.
-        while repeat:
-            z += 1
-
-
-            #step 1
-            #new chunk is the index of the most signicifcant chunk
-            #or none if no chunks are significant
-            new_chunk = find_best_chunk(chunks)
-
-
-            #step 2b
-            if new_chunk is not None:
-
-
-                #step 4a
-                if z > 5:
-                    repeat = False
-
-                interesting_chunks.append(new_chunk)
-                i = new_chunk
-
-                if i == len(chunk_edges) - 1:
-                    out = [chunk_edges[i],len(binned_counts)-1]
-                else:
-                    out = [chunk_edges[i],chunk_edges[i+1]]
-
-                for index in out:
-                    time = (index+1)*t0
-                    detections.append(time)
-
-                if debug:
-                    self.make_fourpanel_plot(outdir='.',save=False,show=True,lines=chunk_edges_times,highlight=detections)
-
-
-                #step 3
-                try:
-                    out = [int(i+.5) for i in out]
-                    del binned_time[out[0]:out[1]+1]
-                    del binned_counts[out[0]:out[1]+1]
-                    try:
-                        del chunks[new_chunk]
-                        chunk_edges = np.delete(chunk_edges,new_chunk)
-                    except Exception as e:
-                        print(chunks)
-                        print(chunk_edges)
-                        print(type(chunk_edges))
-                        raise e
-
-                except IndexError as e:
-                    print(f"Error deleting index [{out[0]}:{out[1]+1}]")
-                    print(binned_time)
-                    print(len(binned_time))
-                    print(binned_counts)
-                    print(len(binned_counts))
-
-                    raise e
-
-                chunk_edges,chunks = make_chunks(binned_counts)
-                if debug:
-                    chunk_edges_times = (chunk_edges+1)*t0
-
-            #step 2a
-            else:
-                repeat = False
-
-
-        if not interesting_chunks:
-            return None
-        else:
-            if self.t_interest is None:
-                self.t_interest = detections
-            else:
-                self.t_interest.extend(detections)
-
-        if debug:
-            print(f'Detections: {detections}')
-            #print(f'out:{out}')
-            #print(f'Binned counts: {binned_counts}')
-            #print(f'Binned times: {binned_time}')
-
-        return detections
-
-    #the same as the above but the chunks are made with Bayesian blocks
-    #no repeating behavior
-    def e_test_blocks(self,pthresh=2.867E-7,binsize=1000, debug = False):
-        #default pthresh set to 5 sigma detection level
-
-        #takes the binned counts array and turns it into chunks using the
-        #bayesian blocks algorithm
-        #returns the edges of the chunks, the chunks themselves
-        def make_chunks(binned_counts):
-            chunk_edges = bayesian_blocks(binned_time,binned_counts,fitness='events',p0=0.001)
-
-
-            #convert the chunk_edges from time space to index space
-            chunk_edges = np.array(chunk_edges)/t0 - 1
-            chunk_edges = chunk_edges[:-1]
-
-            #turning the chunk edges into the chunks themselves
-            #chunks are an array of sub arrays,
-            #each sub array is a list of the values of binned_counts in the chunk
-
-            #initialize the array of empty sub arrays
-            chunks = [[] for i in range(len(chunk_edges))]
-
-            for i,val in enumerate(binned_counts):
-                for j,edge in enumerate(chunk_edges):
-
-                    if edge == chunk_edges[-1]:
-                        chunks[j].append(val)
-                        break
-                    else:
-                        if i >= chunk_edges[j] and i < chunk_edges[j+1]:
-                            chunks[j].append(val)
-                            break
-
-            return (chunk_edges,chunks)
-
-        #when given the array of chunks, applies the e_test and returns the
-        #chunks which are below the pvalue
-        def find_best_chunk(chunks):
-            #initialize the dict of interesting chunks which pass the significance test
-            #key will be the index of the chunk
-            #value will be the p_value
-            interesting_chunks = {}
-
-            #Loop through all the chunks, for each testing if the mean inside the chunk
-            #is significantly different than the mean outside of it
-            #interesting chunks get added to interesting_chunks
-            for i,chunk in enumerate(chunks):
-                #build all_others, an array which contains all the chunks beside the
-                #one being examined
-                if i == 0:
-                    all_others = chunks[1:]
-                else:
-                    all_others = chunks[:i]
-                    seg2 = chunks[i+1:]
-
-                    all_others.extend(seg2)
-
-                #flatten all_others
-                all_others = [bin for sub in all_others for bin in sub]
-
-                if len(chunk) == 0 or len(all_others) == 0 or len(chunk) == 1:
-                    continue
-
-                #if there is a flare, we don't want to consider it if it has fewer than 10 counts
-                if np.mean(chunk) > np.mean(all_others) and sum(chunk) < 10:
-                    continue
-                #if there is a dip, we don't want to consider it if the observation
-                #has fewer than 30 counts
-                elif np.mean(chunk) < np.mean(all_others) and self.total_counts < 30:
-                    continue
-
-
-                if debug:
-                    print(f'Trying E-test on chunk {i}')
-                    print(f'test_poisson_2indep({sum(chunk)},{len(chunk)},{sum(all_others)},{len(all_others)},method="etest")')
-
-                try:
-                    t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
-                except Exception as e:
-                    p_val = 1
-
-                if p_val < pthresh:
-                    if not self.classification:
-                        self.classification = True
-
-                    interesting_chunks[i] = p_val
-
-                    if debug:
-                        print(f'''Detection in chunk {i}
-    This chunk: {chunk}
-    all_others: {all_others}
-    p_val: {p_val}
-    ''')
-
-                else:
-                    if debug:
-                        print(f'''No detection in chunk {i}
-    This chunk: {chunk}
-    all_others: {all_others}
-    p_val: {p_val}
-    ''')
-
-            if not interesting_chunks:
-                return None
-            else:
-                return [i for i in interesting_chunks.keys()]
-
-        if self.total_counts < 3:
-            return None
-
-        #first we need to chunk up the data
-        #AKA dividing the data into chunks where each chunk is delimitted
-        #by the light curve passing through the median of the dataset
-
-        if binsize is None:
-            binned_time = self.times - self.start_time
-            binned_counts = self.counts
-        else:
-            binned_time,binned_counts = self.make_binned_counts(binsize)
-
-        t0 = binned_time[0]
-
-        if binned_counts is None:
-            return None
-
-
-        if debug:
-            print('Making chunks')
-
-        chunk_edges,chunks = make_chunks(binned_counts)
-
-        if len(chunk_edges) == 2:
-            return None
-            
-        if debug:
-            #print(chunk_edges)
-            #print('\n')
-            print('Chunks:')
-            print(chunks)
-            #print(len(binned_counts))
-            chunk_edges_times = (chunk_edges+1)*t0
-            #return [(index+1)*t0 for index in chunk_edges]
-
-
-        detections = []
-
-        if debug:
-            print('finding_chunks')
-
-        interesting_chunks = find_best_chunk(chunks)
-
-        if interesting_chunks is None:
-            return None
-
-        for i in interesting_chunks:
-            if i == len(chunk_edges) - 1:
-                out = [chunk_edges[i],len(binned_counts)-1]
-            else:
-                out = [chunk_edges[i],chunk_edges[i+1]]
-
-            for index in out:
-                time = (index+1)*t0
-                detections.append(time)
-
-
-        if debug:
-            self.make_fourpanel_plot(outdir='.',save=True,show=False,lines=chunk_edges_times,highlight=detections)
-
-
-        if not len(detections):
-            return None
-        else:
-            if self.t_interest is None:
-                self.t_interest = detections
-            else:
-                self.t_interest.extend(detections)
-
-        if debug:
-            print(f'Detections: {detections}')
 
         return detections
 
@@ -1264,18 +838,12 @@ p_val: {p_val}
             plt.savefig(f'{self.name}_HR_LC.pdf')
 
 if __name__ == '__main__':
-    try:
-        debug = 't' in sys.argv[1] or 'T' in sys.argv[1]
-    except IndexError:
-        debug = False
-
-
-    lc = np.loadtxt('./Survey/completed/NGC5194/textfiles/J132952.6934+471142.6143_13814_lc.fits.txt',skiprows=1)
-    obsid = '13814'
-    position = '132952.6934+471142.6143'
+    lc = np.loadtxt('test_lc.txt',skiprows=1)
+    obsid = '6385'
+    position = '01:32:36.83+30:32:29.83'
 
     src = Source(lightcurve=lc,obsid=obsid,position=position)
 
-    times = src.e_test_blocks(binsize=1000,debug=debug)
+    src.e_test_repeat(debug=True)
 
-    #src.make_fourpanel_plot(outdir='.',save=False,show=True,lines=times)
+    src.make_fourpanel_plot('.')

@@ -75,8 +75,6 @@ class Galaxy:
         self.obsids = [i.obsid for i in obsid_region_list]
 
         #The matched regions, filled in when region match is run
-        #Filled in with a list of Source_all objects representing the sources
-        #in the galaxy
         self.matches = None
 
 
@@ -100,6 +98,8 @@ class Galaxy:
         '''
         all_dict = {}
 
+        #error_rate = 0
+        #clean_rate = 0
         for i,region1 in enumerate(mast_region_list):
             #an array of Match objects which represent all the matches
             #the source got
@@ -112,12 +112,8 @@ class Galaxy:
             z = 0
             for source in all_dict.keys():
                 #In case the directory slips away during the process
-                try:
-                    if os.getcwd() != cwd:
-                        os.chdir(cwd)
-                except:
-                    os.chdir(cwd)
-
+                os.chdir(cwd)
+                
                 #the list of region objects which correspond to the regions
                 #which make up source
                 test_against = all_dict[source]

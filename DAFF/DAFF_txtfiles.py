@@ -11,8 +11,6 @@ import sys
 import glob
 import sys
 
-import matplotlib as mpl
-mpl.use('agg')
 
 #recursion depth context manager
 class recursion_depth:
@@ -54,7 +52,7 @@ def restore_match(dir):
 def subreprocess(dir):
     obsid = dir.split('/')[-1]
 
-    working_dir = f'./{dir}/repro'
+    working_dir = f'./{dir}/primary'
 
     try:
         print("Looking for wavdetect product...")
@@ -79,6 +77,9 @@ def process_galaxy(galaxy_name):
 
     #now run wavdetect on each obsid
     dirs = [i for i in os.listdir(os.getcwd()) if re.search('\d',i)]
+
+    if len(dirs) == 0:
+        raise Exception
 
     ###########################
     ###########################
@@ -110,50 +111,6 @@ def process_galaxy(galaxy_name):
         source.optimal_rename()
 
 
-    ###########################
-    ##########################
-    print('\nSaving matches...')
-
-    try:
-        os.makedirs('./matches')
-    except:
-        pass
-
-    os.chdir('./matches')
-    os.system('rm *.pkl')
-
-    #Cannot save the whole galaxy object
-    #Instead, I save all the source all objects by themselves and then
-    #a dummy galaxy object which contains all the other data
-    #This information can be used to restore the state of this program after
-    #matches are made
-
-    with recursion_depth(5000):
-        for all_source in all_sources_in_galaxy:
-            try:
-                all_source.save()
-            except RecursionError as e:
-                print(f'Recursion depth exceeded by {all_source.name}')
-                print(f'This source contains {len(all_source.obs)} observations')
-                print('Trying to save without using save method')
-                try:
-                    with open(f'./SOURCE_ALL_{all_source.name}.pkl','wb') as out:
-                        pkl.dump(all_source,out)
-                except RecursionError as e2:
-                    return all_source
-
-
-    dummy_galaxy = Galaxy(galaxy.name,galaxy.obsid_region_list)
-
-    with open(f'{galaxy_name}_galaxy_obj.pkl','wb') as f:
-        pkl.dump(dummy_galaxy,f)
-
-    sys.exit('Stopped to prevent memory overflow')
-
-    os.chdir('../')
-
-    ###########################
-    ###########################
     try:
         os.makedirs('./textfiles')
     except:
@@ -166,98 +123,14 @@ def process_galaxy(galaxy_name):
     for all_source in all_sources_in_galaxy:
         all_source.save_lcs()
 
-    os.chdir('../')
-    try:
-        os.makedirs('./detections_lcs')
-    except:
-        pass
-    os.chdir('./detections_lcs')
-
-    ###########################
-    ###########################
-    print('\nDetecting dips and flares...')
-    lines = []
-    total = len([source for all_source in all_sources_in_galaxy for source in all_source.obs])
-
-    i = 0
-    for all_source in all_sources_in_galaxy:
-        for source in all_source.obs:
-            print(f'Testing {i} of {total}')
-
-            try:
-                #runs the repeating chunked e-test method
-                #if an interesting chunk is found:
-                #updates source.t_interest to the edges of the interesting times
-                #updates source.classification to True
-                source.e_test_repeat(binsize=1000)
-            except:
-                source.t_interest = None
-                source.classification = False
-
-            if source.classification:
-                source.make_fourpanel_plot(outdir='.')
-
-            csv_line = source.make_csv_line()
-
-            lines.append(csv_line)
-
-            i += 1
-
-    ###########################
-    ###########################
-    print('\nSaving csv...')
-    csv = np.row_stack(lines)
-    header = 'NAME,OBSID,RA,DEC,TOTAL COUNTS,START TIME,END TIME,DURATION,COUNT RATE,INTERESTING,INTERESTING TIMES'
-
-    os.chdir('../')
-
-    np.savetxt('./all_csv.csv',csv,fmt='%s',delimiter=',',header=header)
-
-    ###########################
-    ###########################
-    print('\nMaking HR plots...')
-    try:
-        os.makedirs('./HR_plots')
-    except:
-        pass
-
-    os.chdir('./HR_plots')
-
-    for all_source in all_sources_in_galaxy:
-        for source in all_source.obs:
-
-            if source.classification:
-                evt_dir = f'../{source.obsid}/repro'
-
-                try:
-                    source.make_HR(16,evt_dir)
-                    source.plot_HR_and_lc(1000,'.')
-                except:
-                    pass
-
-    ###########################
-    ###########################
-    print('Saving sources...')
-    os.chdir('../')
-    try:
-        os.makedirs('./sources')
-    except:
-        pass
-    os.system('rm ./sources/*.pkl')
-    os.chdir('./sources')
-
-    for all_source in all_sources_in_galaxy:
-        all_source.save()
-
     return
-
 if __name__ == '__main__':
     #first command line argument controls which galaxies to run on
     #can either list galaxies, seperated by commas
     #or use 'all' to run on all dirs in cwd
 
     if 'all' in sys.argv[1] or 'ALL' in sys.argv[1] or 'All' in sys.argv[1]:
-        galaxies = [i for i in os.listdir(os.getcwd()) if '.txt' not in i]
+        galaxies = [i for i in os.listdir(os.getcwd()) if '.' not in i and 'textfiles' not in i and 'errored' not in i and 'completed' not in i]
 
     else:
         galaxies = sys.argv[1].split(',')
@@ -282,13 +155,13 @@ if __name__ == '__main__':
         print('***********')
 
         try:
-            problematic = process_galaxy(galaxy)
+            process_galaxy(galaxy)
         except Exception as e:
             errors.append(galaxy)
             os.chdir(cwd)
             os.system(f'mv {galaxy} ./errored')
             print(f'{galaxy} erroed, moved to ./errored')
-            raise e
+            #raise e
         else:
             os.chdir(cwd)
             os.system(f'mv {galaxy} ./completed')

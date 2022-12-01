@@ -62,7 +62,10 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
 
     BEHR_outdir = f'{BEHR_DIR}/{obsid}/{position_basic}'
 
-    subprocess.run(f'rm -rf {BEHR_outdir}',shell=True)
+    try:
+        subprocess.run(f'rm -rf {BEHR_outdir}',shell=True)
+    except:
+        pass
     os.makedirs(BEHR_outdir)
 
     make_behr(evt,src_region,bkg_region,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N)

@@ -8,49 +8,9 @@ from region_matching import *
 import re
 import pickle as pkl
 import sys
-import glob
-import sys
-
-import matplotlib as mpl
-mpl.use('agg')
-
-#recursion depth context manager
-class recursion_depth:
-    def __init__(self, limit):
-        self.limit = limit
-        self.default_limit = sys.getrecursionlimit()
-    def __enter__(self):
-        sys.setrecursionlimit(self.limit)
-    def __exit__(self, type, value, traceback):
-        sys.setrecursionlimit(self.default_limit)
-
-def restore_match(dir):
-    cwd = os.getcwd()
-
-    os.chdir(dir)
-
-    source_alls = glob.glob('SOURCE_ALL*')
-
-    galaxyfile = unglob(glob.glob('*galaxy_obj.pkl'))
-
-    with open(galaxyfile,'rb') as f:
-        galaxy = pkl.load(f)
-
-    all_sources = []
-
-    for src in source_alls:
-        with open(src,'rb') as f:
-            all_sources.append(pkl.load(f))
-
-    galaxy.matches = all_sources
-
-    os.chdir(cwd)
-    return galaxy
-
 
 
 #function to handle computationally expensive steps
-# TODO: multithreading
 def subreprocess(dir):
     obsid = dir.split('/')[-1]
 
@@ -101,64 +61,24 @@ def process_galaxy(galaxy_name):
     ###########################
     ###########################
     print('\nMatching regions...')
-
     galaxy.region_match()
-
     all_sources_in_galaxy = galaxy.matches
 
     for source in all_sources_in_galaxy:
         source.optimal_rename()
 
-
-    ###########################
-    ##########################
-    print('\nSaving matches...')
-
-    try:
-        os.makedirs('./matches')
-    except:
-        pass
-
-    os.chdir('./matches')
-    os.system('rm *.pkl')
-
-    #Cannot save the whole galaxy object
-    #Instead, I save all the source all objects by themselves and then
-    #a dummy galaxy object which contains all the other data
-    #This information can be used to restore the state of this program after
-    #matches are made
-
-    with recursion_depth(5000):
-        for all_source in all_sources_in_galaxy:
-            try:
-                all_source.save()
-            except RecursionError as e:
-                print(f'Recursion depth exceeded by {all_source.name}')
-                print(f'This source contains {len(all_source.obs)} observations')
-                print('Trying to save without using save method')
-                try:
-                    with open(f'./SOURCE_ALL_{all_source.name}.pkl','wb') as out:
-                        pkl.dump(all_source,out)
-                except RecursionError as e2:
-                    return all_source
-
-
-    dummy_galaxy = Galaxy(galaxy.name,galaxy.obsid_region_list)
-
-    with open(f'{galaxy_name}_galaxy_obj.pkl','wb') as f:
-        pkl.dump(dummy_galaxy,f)
-
-    sys.exit('Stopped to prevent memory overflow')
-
-    os.chdir('../')
-
-    ###########################
-    ###########################
     try:
         os.makedirs('./textfiles')
     except:
         pass
 
+    with open(f'{galaxy_name}_galaxy_obj.pkl','wb') as f:
+        pkl.dump(galaxy,f)
+
+    sys.exit('Stopped to prevent memory overflow')
+
+    ###########################
+    ###########################
     os.chdir('./textfiles')
     os.system('rm *.txt')
 
@@ -179,20 +99,24 @@ def process_galaxy(galaxy_name):
     lines = []
     total = len([source for all_source in all_sources_in_galaxy for source in all_source.obs])
 
+    #a list of the various bin sizes that are going to be checked
+    binsizes = [250,500,1000,2000]
+
     i = 0
     for all_source in all_sources_in_galaxy:
         for source in all_source.obs:
             print(f'Testing {i} of {total}')
 
-            try:
-                #runs the repeating chunked e-test method
-                #if an interesting chunk is found:
-                #updates source.t_interest to the edges of the interesting times
-                #updates source.classification to True
-                source.e_test_repeat(binsize=1000)
-            except:
-                source.t_interest = None
-                source.classification = False
+            for binsize in binsizes:
+                try:
+                    #runs the repeating chunked e-test method
+                    #if an interesting chunk is found:
+                        #updates source.t_interest to the edges of the interesting times
+                        #updates source.classification to True
+                    source.e_test_repeat(binsize=binsizes)
+                except:
+                    source.t_interest[binsize] = None
+                    source.classification[binsize] = False
 
             if source.classification:
                 source.make_fourpanel_plot(outdir='.')
@@ -282,7 +206,7 @@ if __name__ == '__main__':
         print('***********')
 
         try:
-            problematic = process_galaxy(galaxy)
+            process_galaxy(galaxy)
         except Exception as e:
             errors.append(galaxy)
             os.chdir(cwd)

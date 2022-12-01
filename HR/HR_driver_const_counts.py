@@ -13,6 +13,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     #or use:
     BEHR_DIR = '/Users/sethlarner/BEHR_contain/BEHR'
 
+    #from extract_counts
     download_obsid(obsid)
 
     primary = f'./{obsid}/primary'
@@ -28,11 +29,10 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     else:
         print('Running srcflux to make regions...')
         #If not overriden, we make the regions with src flux
+        #from extract counts
         make_regions(obsid,position,f'{working_dir}/')
 
         src_region = unglob(glob.glob(f'{working_dir}/*srcreg.fits'),True)
-        print(src_region)
-        sys.exit()
         bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'),True)
 
     evt = unglob(glob.glob(f'{primary}/*evt2*'))
@@ -56,6 +56,7 @@ def main(obsid,position,N,lines,divide_energy=2000,override=False,subtract_start
     subprocess.run(f'rm -rf {BEHR_outdir}',shell=True)
     os.makedirs(BEHR_outdir)
 
+    #from BEHR_countbins
     make_behr(evt,src_region,bkg_region,divide_energy,BEHR_DIR,outfile,BEHR_outdir,N)
 
     print('Running BEHR...')
