@@ -88,14 +88,17 @@ def tricolor_split(evt,reg,bin_size):
     return counts_dict
 
 #the driver function
-def make_tricolor_lc(obsid,primary,position,binsize):
+def make_tricolor_lc(obsid,primary,position,binsize,override=False):
     position_basic = sub('\:','',position)
     working_dir = f'{primary}/{position_basic}'
 
-    make_regions(obsid,position,working_dir)
+    if override:
+        src_region = input('Enter path to src region file: ').strip()
 
-    src_region =unglob(glob.glob(f'{working_dir}/*srcreg*'))
-    #bkg_region = unglob(glob.glob(f'{working_dir}/*bkgreg.fits'))
+    else:
+        make_regions(obsid,position,working_dir)
+        src_region =unglob(glob.glob(f'{working_dir}/*srcreg*'))
+
     evt = unglob(glob.glob(f'{primary}/*evt2*'))
 
     src_counts = tricolor_split(evt,src_region,binsize)
@@ -123,9 +126,15 @@ def main():
 
     dir = f'./{obsid}/primary'
 
+    override = input('Override regions (be asked to enter your own regions instead of making them automatically)  [y/n]? ')
+    if 'y' in override:
+        override = True
+    else:
+        override = False
+
     download_obsid(obsid)
 
-    make_tricolor_lc(obsid,dir,pos,bin_size)
+    make_tricolor_lc(obsid,dir,pos,bin_size,override)
 
 
 if __name__ == '__main__':

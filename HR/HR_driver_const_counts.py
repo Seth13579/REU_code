@@ -119,3 +119,7 @@ if __name__ == '__main__':
     lines = None
 
     main(obsid,position,N,lines,override=override,divide_energy=divide)
+
+    os.remove('debugging.txt')
+    os.remove('debugging.npy')
+    os.remove('temp.fits')
