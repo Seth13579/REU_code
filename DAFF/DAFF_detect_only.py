@@ -30,9 +30,7 @@ def find_same_source(file_list):
 
     return out_dict
 
-#095542.2928+690335.6895
-
-if __name__ == '__main__':
+def main():
     galaxy_dirs = sys.argv[1].split(',')
 
     if 'all' in galaxy_dirs:
@@ -84,3 +82,6 @@ ANALYZING {galaxy_dir}, {j+1} OF {len(galaxy_dirs)}
             #gc.collect()
 
         os.chdir(cwd)
+
+if __name__ == '__main__':
+    main()

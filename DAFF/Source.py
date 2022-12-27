@@ -9,15 +9,135 @@ import sys
 import gc
 from astropy.stats import bayesian_blocks
 import warnings
+from scipy import stats
 
 #for the E-test
 from statsmodels.stats.rates import test_poisson_2indep
+
+#for the alternative E-test
+#from poisson_etest import poisson_etest
 
 #HR dependencies
 from extract_counts import *
 from BEHR_countbins import *
 from run_BEHR import *
 from create_behr_files import region_area
+
+def poisson_twosample(count1, exposure1, count2, exposure2, ratio_null=1,method='score', alternative='two-sided'):
+    '''test for ratio of two sample Poisson intensities
+
+    If the two Poisson rates are g1 and g2, then the Null hypothesis is
+
+    H0: g1 / g2 = ratio_null
+
+    against one of the following alternatives
+
+    H1_2-sided: g1 / g2 != ratio_null
+    H1_larger: g1 / g2 > ratio_null
+    H1_smaller: g1 / g2 < ratio_null
+
+    Parameters
+    ----------
+    count1: int
+        Number of events in first sample
+    exposure1: float
+        Total exposure (time * subjects) in first sample
+    count2: int
+        Number of events in first sample
+    exposure2: float
+        Total exposure (time * subjects) in first sample
+    ratio: float
+        ratio of the two Poisson rates under the Null hypothesis. Default is 1.
+    method: string
+        Method for the test statistic and the p-value. Defaults to `'score'`.
+        Current Methods are based on Gu et. al 2008
+        Implemented are 'wald', 'score' and 'sqrt' based asymptotic normal
+        distribution, and the exact conditional test 'exact-cond', and its mid-point
+        version 'cond-midp', see Notes
+    alternative : string
+        The alternative hypothesis, H1, has to be one of the following
+
+           'two-sided': H1: ratio of rates is not equal to ratio_null (default)
+           'larger' :   H1: ratio of rates is larger than ratio_null
+           'smaller' :  H1: ratio of rates is smaller than ratio_null
+
+    Returns
+    -------
+    stat, pvalue two-sided
+
+    not yet
+    #results : Results instance
+    #    The resulting test statistics and p-values are available as attributes.
+
+
+    Notes
+    -----
+    'wald': method W1A, wald test, variance based on separate estimates
+    'score': method W2A, score test, variance based on estimate under Null
+    'wald-log': W3A
+    'score-log' W4A
+    'sqrt': W5A, based on variance stabilizing square root transformation
+    'exact-cond': exact conditional test based on binomial distribution
+    'cond-midp': midpoint-pvalue of exact conditional test
+
+    The latter two are only verified for one-sided example.
+
+    References
+    ----------
+    Gu, Ng, Tang, Schucany 2008: Testing the Ratio of Two Poisson Rates,
+    Biometrical Journal 50 (2008) 2, 2008
+
+    '''
+
+    # copied from statsmodels.stats.weightstats
+    def _zstat_generic2(value, std_diff, alternative):
+        '''generic (normal) z-test to save typing
+
+        can be used as ztest based on summary statistics
+        '''
+        zstat = value / std_diff
+        if alternative in ['two-sided', '2-sided', '2s']:
+            pvalue = stats.norm.sf(np.abs(zstat))*2
+        elif alternative in ['larger', 'l']:
+            pvalue = stats.norm.sf(zstat)
+        elif alternative in ['smaller', 's']:
+            pvalue = stats.norm.cdf(zstat)
+        else:
+            raise ValueError('invalid alternative')
+        return zstat, pvalue
+
+    # shortcut names
+    y1, n1, y2, n2 = count1, exposure1, count2, exposure2
+    d = n2 / n1
+    r = ratio_null
+    r_d = r / d
+
+    if method in ['score']:
+        stat = (y1 - y2 * r_d) / np.sqrt((y1 + y2) * r_d)
+        dist = 'normal'
+    elif method in ['wald']:
+        stat = (y1 - y2 * r_d) / np.sqrt(y1 + y2 * r_d**2)
+        dist = 'normal'
+    elif method in ['sqrt']:
+        stat = 2 * (np.sqrt(y1 + 3 / 8.) - np.sqrt((y2 + 3 / 8.) * r_d))
+        stat /= np.sqrt(1 + r_d)
+        dist = 'normal'
+    elif method in ['exact-cond', 'cond-midp']:
+        from statsmodels.stats import proportion
+        bp = r_d / (1 + r_d)
+        y_total = y1 + y2
+        stat = None
+        pvalue = proportion.binom_test(y1, y_total, prop=bp, alternative=alternative)
+        if method in ['cond-midp']:
+            # not inplace in case we still want binom pvalue
+            pvalue = pvalue - 0.5 * stats.binom.pmf(y1, y_total, bp)
+
+        dist = 'binomial'
+
+    if dist == 'normal':
+        return _zstat_generic2(stat, 1, alternative)
+    else:
+        return stat, pvalue
 
 def load_src_all(file):
     with open(file,'rb') as f:
@@ -105,21 +225,9 @@ class Source_All:
         _dec = sub('\:','',self.dec)
         self.name = f'J{_ra}{_dec}'
 
-        #an array of source objects which represent all non-zero observations
-        #of the source
-        self.obs_nonzero = [i for i in obs if not i.is_zero()]
-
         #the average count rate across all observations of the source
         #units of ks^-1
         self.average_count_rate = 1000*sum([i.total_counts for i in self.obs])/sum([i.duration for i in self.obs])
-
-        #the average count rate across all observations of the source with
-        #non-zero counts
-        #units of ks^-1
-        try:
-            self.av_count_rate_nozeros = 1000*sum([i.total_counts for i in self.obs_nonzero])/sum([i.duration for i in self.obs_nonzero])
-        except:
-            self.av_count_rate_nozeros = 0
 
     def save(self,outdir='.'):
         outfile = f'{outdir}/SOURCE_ALL_{self.name}.pkl'
@@ -1039,9 +1147,10 @@ p_val: {p_val}
                     print(f'test_poisson_2indep({sum(chunk)},{len(chunk)},{sum(all_others)},{len(all_others)},method="etest")')
 
                 try:
-                    t_stat,p_val = test_poisson_2indep(sum(chunk),len(chunk),sum(all_others),len(all_others),method='etest')
+                    t_stat,p_val = poisson_twosample(sum(chunk),len(chunk),sum(all_others),len(all_others),method='score')
                 except Exception as e:
                     p_val = 1
+                    raise e
 
                 if p_val < pthresh:
                     if not self.classification:
@@ -1095,7 +1204,7 @@ p_val: {p_val}
 
         if len(chunk_edges) == 2:
             return None
-            
+
         if debug:
             #print(chunk_edges)
             #print('\n')
@@ -1166,7 +1275,8 @@ p_val: {p_val}
         return np.array(csv_line)
 
     #fills in self.HR with HR information following the method of HR_driver_const_counts
-    def make_HR(self,N,evt_dir,errorval='90',divide_energy=2000,override=False,subtract_start=True):
+    def make_HR(self,N,evt_dir,errorval='90',divide_energy=2000,override=False,
+                subtract_start=True):
         # TODO: Write in override
         '''
         print(f'NAME: {self.name}')

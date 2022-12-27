@@ -11,6 +11,14 @@ import pandas as pd
 from astropy.io import fits
 from astropy.table import Table
 
+def countcheck(evt,reg):
+    '''When given a evt file and a region, returns the number of counts between .3 and 7.5 KeV'''
+
+    dmlist.punlearn()
+    dmlist.infile = f'{evt}[sky=region({reg}),energy=300:7500]'
+    dmlist.opt = 'counts'
+    return int(dmlist())
+
 
 #a class representing all the regions in a given observation
 class Obsid_all_regions:
@@ -26,9 +34,12 @@ class Obsid_all_regions:
 #a class representing a single region
 class Region:
 
-    def __init__(self, path, regtext, ra, dec, a, b, obsid, evt):
+    def __init__(self, path, regtext, ra, dec, a, b, obsid, evt, all_reg_path, bkg_reg = None):
         #the path to the region file
         self.path = path
+
+        #path to the wavdetect made all region path
+        self.all_reg_path = all_reg_path
 
         #the actual string of the region, so that it can be recreated as needed
         self.regtext = regtext
@@ -64,7 +75,100 @@ class Region:
         #a match object corresponding to the best match the region object recieved
         self.best_match = None
 
-    def make_lc(self,outdir='.'):
+        #The text of the background region
+        #can be filled in with self.create_bkg_region
+        self.bkg_reg = bkg_reg
+
+    def create_bkg_region(self,ncounts = 50,outdir='.'):
+        '''
+        Creates a background region to go with the source region represented
+        by this object.
+
+        Background region is created by making an annulus around the source region.
+        The outer radius is then increased in small steps until the region encircles
+        ncounts. The region excludes all point sources detected by wavdetect.
+
+        This region will be used to subtract the background from the source in
+        order to (hopefully) reduce the impact of systematic effects.
+
+        The resulting background region will be save as text in self.bkg_reg
+        '''
+
+        def make_bkg(src_reg,all_reg,size,outdir):
+            '''
+            Makes a background annulus centered on "src_reg" with outer radius
+            equal to "size" arcmins excluding all the point source regions in
+            "all_reg".
+
+            Resulting region saved to "{outdir}/bkg.reg"
+            Returns path to that file.
+            '''
+
+            outfile = f'{outdir}/bkg.reg'
+
+            region = str(np.loadtxt(src_reg,dtype='str'))[8:-1]
+
+            all_region = str(np.loadtxt(all_reg,dtype='str',skiprows=3)).rstrip('#').strip('[]').strip("''")
+            all_region = all_region.split('\n')
+
+            region_list = region.split(",")
+            region_axis_1 = float(region_list[2][:-1])
+            region_axis_2 = float(region_list[3][:-1])
+            #have to convert the axis values from sec to min
+            region_axis_1 *= 0.01667 #converts to arcminutes
+            region_axis_2 *= 0.01667
+            if region_axis_1 > region_axis_2:
+                bkg_radius = region_axis_1
+            else:
+                bkg_radius = region_axis_2
+
+            with open(outfile,'w') as out:
+                bkg_reg = f"annulus({region_list[0]},{region_list[1]},{bkg_radius*1.5}',{(bkg_radius*1.5)+size}')"
+                out.write(bkg_reg)
+                out.write('\n')
+
+                for line in all_region:
+                    line = line.strip()
+                    line = line.strip("''")
+                    out.write(f'\n -{line}')
+
+            return outfile
+
+        stop = False
+        i = 0
+
+        evt = self.evt
+        sec_reg = self.path
+        all_reg = self.all_reg_path
+        #List of radii to try, 1 arcsec to 1.5 arc minutes in 1 arcsec steps
+        sizes = np.arange(.01667,1.5,.01667)
+
+        while not stop:
+            #repeatedly make backgrounds increasing in size until the counts
+            #threshold is reached
+
+            try:
+                bkg = make_bkg(src_reg,all_reg,sizes[i],outdir)
+                i+=1
+
+                check = countcheck(evt,bkg)
+                if check > limit:
+                    stop=True
+
+            except IndexError:
+                stop = True
+
+        with open(bkg,'r') as f:
+            bkg_reg_text = f.read()
+
+        os.remove(bkg)
+
+        self.bkg_reg = bkg_reg_text
+
+        return
+
+
+    def make_lc(self,subtract=True,outdir='.'):
 
         self_region = f"{outdir}/TEMP_{self.name}_{self.obsid}_reg.reg"
         with open(self_region,'w') as reg_file:
@@ -73,6 +177,19 @@ class Region:
         dmextract.punlearn()
 
         dmextract.infile = f'{self.evt}[sky=region({self_region})][bin time=::3.24104]'
+
+        #If the background is to be subtracted, need to make a region and then
+        #Update the dmextract parameters
+        if subtract:
+            create_bkg_region()
+
+            bkg_region = f"{outdir}/TEMP_{self.name}_{self.obsid}_BKG_reg.reg"
+
+            with open(bkg_region,'w') as reg_file:
+                reg_file.write(self.bkg_reg)
+
+            dmextract.bkg = f'{self.evt}[sky=region({bkg_region})][bin time=::3.24104]'
+
         dmextract.outfile = f'{outdir}/{self.name}_{self.obsid}_lc.fits'
         dmextract.opt = 'ltc1'
         dmextract.clobber = 'yes'
@@ -103,6 +220,9 @@ class Region:
         os.remove(f"{outdir}/TEMP_{self.name}_{self.obsid}_lc.fits.txt")
         os.remove(f'{outdir}/{self.name}_{self.obsid}_lc.fits')
         os.remove(self_region)
+
+        if subtract:
+            os.remove(bkg_region)
 
         hdu_list.close()
 
@@ -169,11 +289,7 @@ class Region:
             #alt_region is the region which was previously matched to
             #the source which shares an obsid with self
 
-            alt_source = [x for x in closest_match.source.obs if x.obsid == self.obsid]
-
-            assert len(alt_source) == 1
-
-            alt_source = alt_source[0]
+            alt_source = [x for x in closest_match.source.obs if x.obsid == self.obsid][0]
 
             alt_region = alt_source.region_object
 
@@ -309,7 +425,8 @@ def process_wavdetect(obsid,region_dir,region_file):
                 max(line[7:].strip('()').split(',')[2],line[7:].strip('()').split(',')[3]).rstrip('"'), #a
                 min(line[7:].strip('()').split(',')[2], line[7:].strip('()').split(',')[3]).rstrip('"'), #b
                 obsid, #obsid
-                evt) #evt
+                evt, #evt
+                f'{region_dir}/wavdetect_wcs_reg.fits') #all_reg_path
                 for line in regiontxt]
 
     out = Obsid_all_regions(obsid,regions)

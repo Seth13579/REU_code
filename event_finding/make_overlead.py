@@ -62,16 +62,16 @@ def make_source(filename,source_arr):
 if __name__ == '__main__':
     with open('out.txt','w') as out:
 
-        dir_list = glob.glob('./all_sk_galaxies/*')
-        galaxy_list = [i.split('/')[-1] for i in dir_list]
+        dir_list = [i for i in glob.glob('*') if '.' not in i]
+        galaxy_list = [i.split('/')[-1] for i in dir_list if '.' not in i]
 
         for dir,galaxy in zip(dir_list,galaxy_list):
             out.write(f'\section{co}{galaxy}{cc}\n')
 
             source_arr = []
-            if not os.path.exists(f'{dir}/detections'):
+            if not os.path.exists(f'{dir}/detections_lcs'):
                 continue
-            for file in glob.iglob(f'{dir}/detections/*.png'):
+            for file in glob.iglob(f'{dir}/detections_lcs/*.png'):
                 filename = file.split('/')[-1]
 
                 make_source(filename,source_arr)

@@ -79,6 +79,8 @@ class Galaxy:
         #in the galaxy
         self.matches = None
 
+        #The extent of the D25 isophone of the 
+
 
     #perfroms region matching and returns a list of Source_All objects which
     #represents all the distinct sources in the galaxy
@@ -159,4 +161,8 @@ class Galaxy:
 
 
         self.matches = all_dict.keys()
+
+        #We no longer need this field, deleting it to save memory and disk space
+        self.obsid_region_list = None
+
         return all_dict.keys()
