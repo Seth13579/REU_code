@@ -20,13 +20,14 @@ def seperation(reg1,reg2):
 
     return c1.separation(c2).arcsecond
 
-'''
-When given two regions, tests if they represent the same source
-The criteria of which is as follows:
-    If the seperation betweem the regions is less than 2 * either of the
-    semimajor axes of the regions
-'''
 def match_test(reg1,reg2):
+    '''
+    When given two regions, tests if they represent the same source
+    The criteria of which is as follows:
+        If the seperation betweem the regions is less than 2 * either of the
+        semimajor axes of the regions
+    '''
+
     if reg1.obsid == reg2.obsid:
         return False
 
@@ -44,7 +45,6 @@ def match_test(reg1,reg2):
 
         raise e
 
-
 class Match:
     '''Describing the match between a region and a source'''
     def __init__(self,region,matched_region,source):
@@ -59,13 +59,18 @@ class Match:
 
         self.sep = seperation(region,matched_region)
 
-
 class Galaxy:
     '''class representing all the observations of one galaxy'''
 
-    def __init__(self,name,obsid_region_list):
+    def __init__(self,name,obsid_region_list,D25=None,ra=None,dec=None):
         #the name of the galaxy
         self.name = name
+
+        #RA of the galaxy in degrees
+        self.ra = ra
+
+        #declination of the galaxy in degrees
+        self.dec = dec
 
         #the list of "Obsid_all_regions" objects
         #represents the output of wavdetect for all the obsids in the galaxy
@@ -79,8 +84,8 @@ class Galaxy:
         #in the galaxy
         self.matches = None
 
-        #The extent of the D25 isophone of the 
-
+        #The extent of the D25 isophone of the galaxy in degrees
+        self.D25 = D25
 
     #perfroms region matching and returns a list of Source_All objects which
     #represents all the distinct sources in the galaxy
@@ -166,3 +171,41 @@ class Galaxy:
         self.obsid_region_list = None
 
         return all_dict.keys()
+
+    def eliminate_outside(self):
+        '''
+        Uses the extent of the D25 isophone to delete sources from the galaxy
+        lie outside of the visual extent of the galaxy.
+
+        Modifies in place the self.obsid_region_list attribute.
+        After called, all the sources within self.matches are inside the D25.
+        '''
+
+        galaxy_coords = SkyCoord(self.ra,self.dec,unit=u.deg,frame='fk5')
+
+        _obsid_region_list = []
+
+        for obsid_all_region in self.obsid_region_list:
+
+            #Array of trues and falses
+            #True if source is within galaxy and will be kept, false otherwise
+            mask = []
+
+            for region in obsid_all_region.all_regions:
+                region_coords = SkyCoord(region.ra,region.dec,unit=(u.hourangle, u.deg),frame='fk5')
+
+                sep = galaxy_coords.seperation(region_coords).arcminute
+
+                if sep > self.D25:
+                    mask.append(False)
+
+                else:
+                    mask.append(True)
+
+            obsid_all_region.all_regions = obsid_all_region.all_regions[mask]
+
+            _obsid_region_list.append(obsid_all_region)
+
+        self.obsid_region_list = _obsid_region_list
+
+        return

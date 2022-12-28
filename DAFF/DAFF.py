@@ -12,10 +12,10 @@ import glob
 import sys
 
 import matplotlib as mpl
-mpl.use('agg')
+#mpl.use('agg')
 
-#recursion depth context manager
 class recursion_depth:
+    '''recursion depth context manager'''
     def __init__(self, limit):
         self.limit = limit
         self.default_limit = sys.getrecursionlimit()
@@ -47,11 +47,8 @@ def restore_match(dir):
     os.chdir(cwd)
     return galaxy
 
-
-
-#function to handle computationally expensive steps
-# TODO: multithreading
 def subreprocess(dir):
+    '''function to handle computationally expensive steps'''
     obsid = dir.split('/')[-1]
 
     working_dir = f'./{dir}/repro'
@@ -70,11 +67,47 @@ def subreprocess(dir):
 
     return all_regions_in_obsid
 
+def download_galaxy(name,ra,dec,D25):
+    cwd = os.getcwd()
+
+    try:
+        os.makedirs(name)
+    except:
+        pass
+
+    os.chdir(name)
+
+    find_chandra_obsid.punlearn()
+
+    find_chandra_obsid.arg = ra
+    find_chandra_obsid.dec = dec
+    find_chandra_obsid.radius = 2*D25 #must be in arcmin
+    find_chandra_obsid.grating = 'none'
+    find_chandra_obsid.instrument='acis'
+    find_chandra_obsid.download = 'none'
+
+    output = find_chandra_obsid().splitlines()
+
+    if len(output) == 1: #when there are no observations found
+        os.chdir(cwd)
+        os.rmdir(name)
+        return False
+
+    obsids = [i.split()[0] for i in output[1:]]
+
+    for i,ob in enumerate(obsids):
+        print(f'Downloading obsid {ob}, {i+1} of {len(obsids)}')
+        os.system(f'download_chandra_obsid {obsid} --exclude evt1,evt1a,vvref')
+
+    os.chdir(cwd)
+
+    return True
+
 #carrys out the steps of region making and matching to create a galaxy class object
 #assumes that the data is downloaded and reprocessed
 #then produces textfiles in ./{galaxy}/textfiles
 #then produces plots in
-def process_galaxy(galaxy_name):
+def process_galaxy(galaxy_name,ra,dec,D25):
     os.chdir(f'./{galaxy_name}')
 
     #now run wavdetect on each obsid
@@ -96,7 +129,12 @@ def process_galaxy(galaxy_name):
         if new is not None:
             all_regions_in_galaxy.append(new)
 
-    galaxy = Galaxy(galaxy_name,all_regions_in_galaxy)
+    galaxy = Galaxy(galaxy_name,all_regions_in_galaxy,D25=D25,ra=ra,dec=dec)
+
+    ###########################
+    ###########################
+    print('\nCulling regions...')
+    galaxy.eliminate_outside()
 
     ###########################
     ###########################
@@ -133,22 +171,12 @@ def process_galaxy(galaxy_name):
             try:
                 all_source.save()
             except RecursionError as e:
-                print(f'Recursion depth exceeded by {all_source.name}')
-                print(f'This source contains {len(all_source.obs)} observations')
-                print('Trying to save without using save method')
-                try:
-                    with open(f'./SOURCE_ALL_{all_source.name}.pkl','wb') as out:
-                        pkl.dump(all_source,out)
-                except RecursionError as e2:
-                    return all_source
-
+                pass
 
     dummy_galaxy = Galaxy(galaxy.name,galaxy.obsid_region_list)
 
     with open(f'{galaxy_name}_galaxy_obj.pkl','wb') as f:
         pkl.dump(dummy_galaxy,f)
-
-    sys.exit('Stopped to prevent memory overflow')
 
     os.chdir('../')
 
@@ -213,6 +241,7 @@ def process_galaxy(galaxy_name):
 
     np.savetxt('./all_csv.csv',csv,fmt='%s',delimiter=',',header=header)
 
+    '''
     ###########################
     ###########################
     print('\nMaking HR plots...')
@@ -249,23 +278,60 @@ def process_galaxy(galaxy_name):
     for all_source in all_sources_in_galaxy:
         all_source.save()
 
+    '''
+
     return
 
-if __name__ == '__main__':
-    #first command line argument controls which galaxies to run on
-    #can either list galaxies, seperated by commas
-    #or use 'all' to run on all dirs in cwd
 
-    if 'all' in sys.argv[1] or 'ALL' in sys.argv[1] or 'All' in sys.argv[1]:
-        galaxies = [i for i in os.listdir(os.getcwd()) if '.txt' not in i]
+def lookup_galaxy(name,table_data):
+    '''Looks up the given galaxy in the table, returns (ra (deg),dec (deg),D25)
+    Raises exception if name not found in the table'''
+
+    try:
+        idx = np.where(table_data[::,0] == name)[0][0]
+    except ValueError as e:
+        print('Galaxy not found in table')
+
+    ra_sex = ':'.join([table_data[idx,1],table_data[idx,2],table_data[idx,2]])
+    dec_sex = ':'.join([''.join([table_data[idx,4],table_data[idx,5]]),table_data[idx,6],table_data[idx,7]])
+
+    c = SkyCoord(ra_sex,dec_sex,unit=(u.hourangle, u.deg),frame='fk5')
+
+    ra = c.ra.degree
+    dec = c.dec.degree
+    D25 = float(table_data[idx,8])
+
+    return (ra,dex,D25)
+
+
+if __name__ == '__main__':
+    #table is a numpy file detailing all the information about the galaxies
+    #it has the following columns
+    #COL 0: GALAXY NAMES
+    #COL 1: Hour of Right Ascension
+    #COL 2: Minute of Right Ascension
+    #COL 3: Second of Right Ascension
+    #COL 4: Sign of the Declination
+    #COL 5: Degree of Declination
+    #COL 6: Arcminute of Declination
+    #COL 7: Arcsecond of Declination
+    #COL 8: D25 (arcmin)
+    table_data = np.load(sys.argv[1])
+
+    #second command line argument controls which galaxies to run on
+    #can either list galaxies, seperated by commas
+    #or use 'all' to run on all galaxies in the table
+    if 'all' in sys.argv[2] or 'ALL' in sys.argv[2] or 'All' in sys.argv[2]:
+        galaxies = table_data[::,0]
 
     else:
-        galaxies = sys.argv[1].split(',')
+        galaxies = sys.argv[2].split(',')
 
     errors = []
 
     cwd = os.getcwd()
 
+    #making the folders we will need.
     try:
         os.makedirs('./errored')
     except:
@@ -277,22 +343,38 @@ if __name__ == '__main__':
         pass
 
     for i,galaxy in enumerate(galaxies):
+        ra,dec,D25 = lookup_galaxy(galaxy,table_data)
+
         print('***********')
-        print(f'PROCESSING {galaxy}, {i+1} OF {len(galaxies)}')
+        print(f'DOWNLOADING {galaxy}, {i+1} OF {len(galaxies)}')
         print('***********')
 
-        try:
-            problematic = process_galaxy(galaxy)
-        except Exception as e:
+        cont = download_galaxy(galaxy,ra,dec,D25)
+
+        if cont:
+            print('***********')
+            print(f'PROCESSING {galaxy}, {i+1} OF {len(galaxies)}')
+            print('***********')
+
+            try:
+                problematic = process_galaxy(galaxy,ra,dec,D25)
+            except Exception as e:
+                errors.append(galaxy)
+                os.chdir(cwd)
+                os.system(f'mv {galaxy} ./errored')
+                print(f'{galaxy} erroed, moved to ./errored')
+            else:
+                os.chdir(cwd)
+                os.system(f'mv {galaxy} ./completed')
+                print(f'{galaxy} completed without error, moved to ./completed')
+        else:
+            print('NO MATCHED OBSERVATIONS')
+            print('MOVING TO ERRORED')
+
             errors.append(galaxy)
             os.chdir(cwd)
             os.system(f'mv {galaxy} ./errored')
             print(f'{galaxy} erroed, moved to ./errored')
-            raise e
-        else:
-            os.chdir(cwd)
-            os.system(f'mv {galaxy} ./completed')
-            print(f'{galaxy} completed without error, moved to ./completed')
 
     with open('Error_doc.txt','w') as f:
         for gal in errors:
