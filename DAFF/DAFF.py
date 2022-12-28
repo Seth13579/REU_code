@@ -301,7 +301,7 @@ def lookup_galaxy(name,table_data):
     dec = c.dec.degree
     D25 = float(table_data[idx,8])
 
-    return (ra,dex,D25)
+    return (ra,dec,D25)
 
 
 if __name__ == '__main__':
